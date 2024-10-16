@@ -14,9 +14,10 @@ set.seed(123)
 ```
 
 ```{r}
-counts = read.csv("~/Downloads/RawFiles/Counts_Vanderbilt.csv", row.names = 1) 
+counts = read.csv("~/Documents/LungPredict1_paper/RawFiles/Counts_Vanderbilt.csv", row.names = 1) 
 sc_rnaseq = LoadH5Seurat("~/all_samples.h5seurat",  assays = "RNA")
 sc_rnaseq <- subset(sc_rnaseq, subset = n_genes > 200 & total_counts < 2500 & pct_counts_mt < 5)
+sc_rnaseq <- sc_rnaseq[, 1:100]
 ```
 
 ```{r}
@@ -82,6 +83,9 @@ coding_genes <- annotations_symbol %>%
 counts = counts[rownames(counts) %in% coding_genes,]
 ```
 
+```{r}
+sc_rnaseq = sc_rnaseq[rownames(sc_rnaseq)%in%coding_genes,]
+```
 
 ```{r}
 single_cell_object = as.matrix(sc_rnaseq@assays$RNA@data)
@@ -99,15 +103,9 @@ signature <- omnideconv::build_model(single_cell_object, cell_type_annotations,
                                      batch_ids, method = "dwls", dwls_method = 'mast_optimized')
 ```
 
-Deconvolve mixture
+Upload signature
 ```{r}
-deconvolution <- omnideconv::deconvolute(bulk_gene_expression = counts, model = signature,
-                                         method = "dwls", dwls_submethod = "DampenedWLS", verbose = T)
-```
-
-Test signature
-```{r}
-sig_file = read.delim2('../Documents/CellTFusion/user_projects/src/signatures/CBSX-Melanoma-scRNAseq.txt')
+sig_file = read.delim2('~/Documents/CellTFusion/user_projects/src/signatures/CBSX-Melanoma-scRNAseq.txt')
 genes = sig_file$NAME
 
 sig_file <- sig_file %>%
@@ -120,19 +118,72 @@ sig_file <- sig_file %>%
 
 ```
 
-AutoGeneS
+AutoGeneS: Need single cell object
 ```{r}
-signature_autogenes <- omnideconv::build_model(single_cell_object, cell_type_annotations,
-                                     batch_ids, method = "autogenes")
-deconvolution <- omnideconv::deconvolute(bulk_gene_expression = counts, model = sig_file,
-                                         method = "autogenes", verbose = T)
-deconvolute_autogenes()
+deconvolution = deconvolute_autogenes(bulk_gene_expression = counts, single_cell_object = single_cell_object,
+                                      cell_type_annotations = cell_type_annotations, verbose = T)
 ```
 
-
-DWLS
+BayesPrism: Need single cell object
 ```{r}
-deconvolution <- omnideconv::deconvolute(bulk_gene_expression = counts, model = sig_file,
-                                         method = "dwls", dwls_submethod = "DampenedWLS", verbose = T)
+deconvolution = deconvolute_bayesprism(bulk_gene_expression = counts, single_cell_object = single_cell_object,
+                                       cell_type_annotations = cell_type_annotations, n_cores = 12)
+```
+
+Bisque: Need single cell object
+```{r}
+deconvolution = deconvolute_bisque(bulk_gene_expression = as.matrix(counts), single_cell_object = single_cell_object,
+                                   cell_type_annotations = cell_type_annotations, batch_ids = batch_ids, verbose = T)
+```
+
+Bseq-Sc: You can input the matrix
+```{r}
+deconvolution = deconvolute_bseqsc(bulk_gene_expression = counts, signature = sig_file, 
+                                   log = T, verbose = T)
+```
+
+CDseqR: Need single cell object
+```{r}
+deconvolution = deconvolute_cdseq(bulk_gene_expression = as.matrix(counts), single_cell_object = single_cell_object,
+                                  cell_type_annotations = cell_type_annotations, batch_ids = batch_ids, verbose = T)
+```
+
+CIBERSORTx: You can input the matrix
+```{r}
+deconvolution = deconvolute_cibersortx(bulk_gene_expression = counts, signature = sig_file)
+```
+
+CPM: Need single cell object
+```{r}
+deconvolution = deconvolute_cpm(bulk_gene_expression = as.matrix(counts), single_cell_object = single_cell_object,
+                                cell_type_annotations = cell_type_annotations, no_cores = 12, verbose = T)
+```
+
+DWLS: You can input the matrix
+```{r}
+deconvolution = deconvolute_dwls(bulk_gene_expression = counts, model = sig_file, 
+                                 dwls_submethod = "DampenedWLS", verbose = T)
+```
+
+MOMF: You can input the matrix
+```{r}
+deconvolution = deconvolute_momf(bulk_gene_expression = counts, signature = sig_file, 
+                                 method = "KL", verbose = T)
+```
+
+MuSiC: Need single cell
+```{r}
+deconvolution = deconvolute_music(bulk_gene_expression = as.matrix(counts), single_cell_object = single_cell_object,
+                                  cell_type_annotations = cell_type_annotations, batch_ids = batch_ids, verbose = T)
+```
+
+Scaden: You can input the matrix
+```{r}
+deconvolution = deconvolute_scaden(bulk_gene_expression = counts, signature = sig_file, verbose = T)
+```
+
+SCDC: You can input the matrix
+```{r}
+deconvolution = deconvolute_scdc(bulk_gene_expression = counts, signature = sig_file, verbose = T)
 ```
 
