@@ -10,14 +10,15 @@ library(SeuratDisk)
 library(patchwork)
 library(ggplot2)
 library(dplyr)
+library(omnideconv)
 set.seed(123)
 ```
 
 ```{r}
-counts = read.csv("~/Documents/LungPredict1_paper/RawFiles/Counts_Vanderbilt.csv", row.names = 1) 
+counts = read.csv("~/Downloads/RawFiles/Counts_Vanderbilt.csv", row.names = 1) 
 sc_rnaseq = LoadH5Seurat("~/all_samples.h5seurat",  assays = "RNA")
 sc_rnaseq <- subset(sc_rnaseq, subset = n_genes > 200 & total_counts < 2500 & pct_counts_mt < 5)
-sc_rnaseq <- sc_rnaseq[, 1:100]
+sc_rnaseq <- sc_rnaseq[1:50, sample(100, 50)]
 ```
 
 ```{r}
@@ -81,6 +82,7 @@ coding_genes <- annotations_symbol %>%
   pull(hgnc_symbol)
 
 counts = counts[rownames(counts) %in% coding_genes,]
+norm_counts = ADImpute::NormalizeTPM(counts, log=T) 
 ```
 
 ```{r}
@@ -89,6 +91,7 @@ sc_rnaseq = sc_rnaseq[rownames(sc_rnaseq)%in%coding_genes,]
 
 ```{r}
 single_cell_object = as.matrix(sc_rnaseq@assays$RNA@data)
+single_cell_object_scale = as.matrix(sc_rnaseq@assays$RNA@scale.data)
 cell_type_annotations = sc_rnaseq@meta.data$annotated_ct
 batch_ids = sc_rnaseq@meta.data$sample
 
@@ -96,42 +99,37 @@ rm(sc_rnaseq)
 gc()
 ```
 
-Build model
-```{r}
-library(omnideconv)
-signature <- omnideconv::build_model(single_cell_object, cell_type_annotations,
-                                     batch_ids, method = "dwls", dwls_method = 'mast_optimized')
-```
-
 Upload signature
 ```{r}
-sig_file = read.delim2('~/Documents/CellTFusion/user_projects/src/signatures/CBSX-Melanoma-scRNAseq.txt')
-genes = sig_file$NAME
+sig_file = read.delim('~/Documents/CellTFusion/user_projects/src/signatures/CBSX-Melanoma-scRNAseq.txt', row.names = 1)
+genes = rownames(sig_file)
 
 sig_file <- sig_file %>%
-  column_to_rownames("NAME") %>%
   apply(., 2, as.numeric) %>%
   data.frame() %>%
   mutate("Genes" = genes) %>%
   column_to_rownames("Genes") %>%
   as.matrix()
-
 ```
 
 AutoGeneS: Need single cell object
 ```{r}
-deconvolution = deconvolute_autogenes(bulk_gene_expression = counts, single_cell_object = single_cell_object,
-                                      cell_type_annotations = cell_type_annotations, verbose = T)
+#signature <- omnideconv::build_model(single_cell_object_scale, as.character(cell_type_annotations), method = "autogenes") #takes too much time
+deconvolution = deconvolute_autogenes(bulk_gene_expression = norm_counts, single_cell_object = single_cell_object_scale,
+                                      cell_type_annotations = as.character(cell_type_annotations), verbose = T)
+head(deconvolution$proportions)
 ```
 
 BayesPrism: Need single cell object
 ```{r}
+signature <- omnideconv::build_model(single_cell_object, as.character(cell_type_annotations), method = "bayesprism") #does not return signature
 deconvolution = deconvolute_bayesprism(bulk_gene_expression = counts, single_cell_object = single_cell_object,
-                                       cell_type_annotations = cell_type_annotations, n_cores = 12)
+                                       cell_type_annotations = cell_type_annotations, n_cores = 8)
 ```
 
 Bisque: Need single cell object
 ```{r}
+signature <- omnideconv::build_model(single_cell_object, as.character(cell_type_annotations), method = "bisque") #does not return signature
 deconvolution = deconvolute_bisque(bulk_gene_expression = as.matrix(counts), single_cell_object = single_cell_object,
                                    cell_type_annotations = cell_type_annotations, batch_ids = batch_ids, verbose = T)
 ```
@@ -140,12 +138,14 @@ Bseq-Sc: You can input the matrix
 ```{r}
 deconvolution = deconvolute_bseqsc(bulk_gene_expression = counts, signature = sig_file, 
                                    log = T, verbose = T)
+#Need CIBERSORT source R code
 ```
 
 CDseqR: Need single cell object
 ```{r}
-deconvolution = deconvolute_cdseq(bulk_gene_expression = as.matrix(counts), single_cell_object = single_cell_object,
-                                  cell_type_annotations = cell_type_annotations, batch_ids = batch_ids, verbose = T)
+signature <- omnideconv::build_model(single_cell_object, as.character(cell_type_annotations), method = "cdseq") #does not return signature
+deconvolution = deconvolute_cdseq(bulk_gene_expression = as.matrix(counts), single_cell_object = single_cell_object, no_cores = 8,
+                                  cell_type_annotations = cell_type_annotations, batch_ids = batch_ids, verbose = T) #errpr
 ```
 
 CIBERSORTx: You can input the matrix
@@ -155,35 +155,92 @@ deconvolution = deconvolute_cibersortx(bulk_gene_expression = counts, signature 
 
 CPM: Need single cell object
 ```{r}
+signature <- omnideconv::build_model(single_cell_object, as.character(cell_type_annotations), method = "cpm") #does not return signature
 deconvolution = deconvolute_cpm(bulk_gene_expression = as.matrix(counts), single_cell_object = single_cell_object,
-                                cell_type_annotations = cell_type_annotations, no_cores = 12, verbose = T)
+                                cell_type_annotations = cell_type_annotations, no_cores = 8, verbose = T)
 ```
 
 DWLS: You can input the matrix
 ```{r}
-deconvolution = deconvolute_dwls(bulk_gene_expression = counts, model = sig_file, 
+deconvolution = deconvolute_dwls(bulk_gene_expression = counts, signature = sig_file, 
                                  dwls_submethod = "DampenedWLS", verbose = T)
 ```
 
-MOMF: You can input the matrix
+MOMF: Need single cell
 ```{r}
-deconvolution = deconvolute_momf(bulk_gene_expression = counts, signature = sig_file, 
-                                 method = "KL", verbose = T)
+### compute the cell type specific expression level as reference
+# signature = cell type specific expression levels reference used by MOMF --> priorU <- momf.computeRef(sc_counts, sc_cell_type)
+signature <- omnideconv::build_model_momf(single_cell_object, as.character(cell_type_annotations), counts) #return signature
+deconvolution = deconvolute_momf(bulk_gene_expression = counts, single_cell_object = single_cell_object, signature = signature, method = "KL", verbose = T)
 ```
 
 MuSiC: Need single cell
 ```{r}
+signature <- omnideconv::build_model(single_cell_object, as.character(cell_type_annotations), method = "music") #does not return signature
 deconvolution = deconvolute_music(bulk_gene_expression = as.matrix(counts), single_cell_object = single_cell_object,
                                   cell_type_annotations = cell_type_annotations, batch_ids = batch_ids, verbose = T)
 ```
 
-Scaden: You can input the matrix
+Scaden: Need single cell
 ```{r}
-deconvolution = deconvolute_scaden(bulk_gene_expression = counts, signature = sig_file, verbose = T)
+signature <- omnideconv::build_model(bulk_gene_expression = counts, single_cell_object, as.character(cell_type_annotations), method = "scaden") #does not return signature
+deconvolution = deconvolute_scaden(bulk_gene_expression = counts, signature = '~/Documents/CellTFusion/user_projects/src/signatures/', verbose = T)
 ```
 
-SCDC: You can input the matrix
+SCDC: Need single cell
 ```{r}
-deconvolution = deconvolute_scdc(bulk_gene_expression = counts, signature = sig_file, verbose = T)
+deconvolution = deconvolute_scdc(bulk_gene_expression = as.matrix(counts), single_cell_object = single_cell_object, 
+                                  cell_type_annotations = cell_type_annotations, batch_ids = batch_ids, verbose = T)
+```
+
+Testing methods 
+```{r}
+sc_object = single_cell_object
+bulk_counts = norm_counts
+cell_annotations = cell_type_annotations
+samples_ids = batch_ids
+```
+
+```{r}
+message("Running second generation cell-type deconvolution methods using scRNAseq\n")
+
+cat("\nRunning AutogeneS...............................................................\n")
+dwls = deconvolute_autogenes(bulk_gene_expression = bulk_counts, single_cell_object = sc_object,
+                             cell_type_annotations = as.character(cell_annotations), verbose = T)$proportions
+cat("\nRunning BayesPrism...............................................................\n")
+bayesprism = deconvolute_bayesprism(bulk_gene_expression = bulk_counts, single_cell_object = sc_object,
+                              cell_type_annotations = cell_type_annotations, n_cores = 8) #raw counts
+cat("\nRunning Bisque...............................................................\n")
+bisque = deconvolute_bisque(bulk_gene_expression = as.matrix(bulk_counts), single_cell_object = sc_object,
+                                cell_type_annotations = cell_type_annotations, batch_ids = samples_ids, verbose = T) #raw counts
+# cat("\nRunning BSeq-sc...............................................................\n") #Need CIBERSORT source code
+# bseqsc = deconvolute_bisque(bulk_gene_expression = as.matrix(bulk_counts), single_cell_object = sc_object,
+#                             cell_type_annotations = cell_type_annotations, batch_ids = samples_ids, verbose = T)
+cat("\nRunning CDSeq...............................................................\n")
+cdseq = deconvolute_cdseq(bulk_gene_expression = as.matrix(bulk_counts), single_cell_object = sc_object, no_cores = 8, #raw counts
+                           cell_type_annotations = cell_type_annotations, batch_ids = samples_ids, verbose = T)$cdseq_prop_merged_byCorr
+cat("\nRunning CibersortX...............................................................\n")
+set_cibersortx_credentials("marcelo.hurtado@inserm.fr", "734212f6ad77fc4eea2bdb502792f294")
+model_cbsx <- omnideconv::build_model(sc_object, as.character(cell_type_annotations), batch_ids = samples_ids, method = "cibersortx") 
+cibersortx = deconvolute_cibersortx(bulk_gene_expression = as.matrix(bulk_counts), signature = model_cbsx, verbose = T)
+cat("\nRunning CPM...............................................................\n")
+cpm = deconvolute_cpm(bulk_gene_expression = as.matrix(bulk_counts), single_cell_object = sc_object, no_cores = 8, #raw counts
+                             cell_type_annotations = cell_type_annotations, verbose = T)
+cat("\nRunning DWLS...............................................................\n")
+model_dwls <- omnideconv::build_model(sc_object, as.character(cell_type_annotations), batch_ids = samples_ids, method = "dwls") 
+deconvolution_dwls = deconvolute_dwls(bulk_gene_expression = bulk_counts, signature = model_dwls, dwls_submethod = "DampenedWLS", verbose = T)
+cat("\nRunning MOMF...............................................................\n")
+model_momf <- omnideconv::build_model(bulk_gene_expression = bulk_counts, sc_object, as.character(cell_type_annotations), batch_ids = samples_ids, method = "momf") #raw counts 
+momf = deconvolute_momf(bulk_gene_expression = as.matrix(bulk_counts), single_cell_object = sc_object,
+                              signature = model_momf, method = "KL", verbose = T)
+cat("\nRunning MuSiC...............................................................\n")
+music = deconvolute_music(bulk_gene_expression = as.matrix(bulk_counts), single_cell_object = sc_object,
+                             cell_type_annotations = cell_type_annotations,  batch_ids = samples_ids, verbose = T)
+cat("\nRunning Scaden...............................................................\n")
+model_scaden <- omnideconv::build_model(bulk_gene_expression = bulk_counts, sc_object, as.character(cell_type_annotations), batch_ids = samples_ids, method = "scaden") 
+scaden = deconvolute_scaden(bulk_gene_expression = bulk_counts, signature = model_scaden, verbose = T)
+cat("\nRunning SCDC...............................................................\n")
+scdc = deconvolute_scdc(bulk_gene_expression = as.matrix(bulk_counts), single_cell_object = sc_object, 
+                        cell_type_annotations = cell_type_annotations, batch_ids = samples_ids, verbose = T)
 ```
 
