@@ -15,7 +15,7 @@ set.seed(123)
 ```
 
 ```{r}
-counts = read.csv("~/Documents/LungPredict1_paper/RawFiles/Counts_Vanderbilt.csv", row.names = 1) 
+counts = read.csv("~/Downloads/RawFiles/Counts_Vanderbilt.csv", row.names = 1) 
 sc_rnaseq = LoadH5Seurat("~/all_samples.h5seurat",  assays = "RNA")
 sc_rnaseq <- subset(sc_rnaseq, subset = n_genes > 200 & total_counts < 2500 & pct_counts_mt < 5)
 sc_rnaseq <- sc_rnaseq[, sample(2000, 200)]
@@ -203,7 +203,7 @@ samples_ids = batch_ids
 
 ```{r}
 x = compute_sc_deconvolution_methods(bulk_counts, sc_object, cell_annotations, samples_ids, "Vanderbilt",
-                                     n_cores = 12, "marcelo.hurtado@inserm.fr", "734212f6ad77fc4eea2bdb502792f294")
+                                     n_cores = 8, "marcelo.hurtado@inserm.fr", "734212f6ad77fc4eea2bdb502792f294")
 ```
 
 ```{r}
@@ -235,9 +235,9 @@ compute_sc_deconvolution_methods = function(raw_counts, sc_object, cell_annotati
   # bseqsc = deconvolute_bisque(bulk_gene_expression = as.matrix(bulk_counts), single_cell_object = sc_object,
   #                             cell_type_annotations = cell_type_annotations, batch_ids = samples_ids, verbose = T)
   
-  message("\nRunning CDSeq...............................................................\n")
-  cdseq = deconvolute_cdseq(bulk_gene_expression = as.matrix(raw_counts), single_cell_object = sc_object, no_cores = n_cores, 
-                             cell_type_annotations = cell_type_annotations, batch_ids = samples_ids, verbose = T)$cdseq_prop_merged_byCorr
+  # message("\nRunning CDSeq...............................................................\n") Error: Error in cdseq_synth_scRNA_seurat[["RNA"]]$counts : $ operator not defined for this S4 class
+  # cdseq = deconvolute(bulk_gene_expression = as.matrix(raw_counts), single_cell_object = sc_rnaseq, no_cores = n_cores, method = "cdseq",
+  #                     cell_type_annotations = cell_type_annotations, batch_ids = samples_ids, verbose = T)
   
   message("\nRunning CibersortX...............................................................\n")
   if(is.null(cbsx_name)&is.null(cbsx_token)){
@@ -251,9 +251,9 @@ compute_sc_deconvolution_methods = function(raw_counts, sc_object, cell_annotati
                                         signature = model_cbsx, verbose = T)
   }
   
-  message("\nRunning CPM...............................................................\n")
-  cpm = deconvolute_cpm(bulk_gene_expression = as.matrix(raw_counts), single_cell_object = sc_object, no_cores = n_cores, #raw counts
-                               cell_type_annotations = cell_type_annotations, verbose = T)$cellTypePredictions
+  # message("\nRunning CPM...............................................................\n") Error: Error in currXY[c(ch, ch[1]), ] : incorrect number of dimensions
+  # cpm = deconvolute_cpm(bulk_gene_expression = data.frame(bulk_counts), single_cell_object = sc_object, no_cores = n_cores, #raw counts
+  #                              cell_type_annotations = as.character(cell_type_annotations), verbose = T)$cellTypePredictions
   
   message("\nRunning DWLS...............................................................\n")
   model_dwls <- omnideconv::build_model(sc_object, as.character(cell_type_annotations), 
