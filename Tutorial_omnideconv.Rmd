@@ -1,0 +1,210 @@
+---
+title: "Tutorial_omnideconv"
+output: html_document
+date: "2024-10-18"
+---
+
+```{r setup, include=FALSE}
+library(Seurat)
+library(tidyverse)
+library(omnideconv)
+library(readxl)
+library(ggpubr)
+```
+
+Single cell data processing
+```{r}
+single.cell.data <- Seurat::ReadMtx(
+  mtx = './GSE176078_Wu_etal_2021_BRCA_scRNASeq/Wu_etal_2021_BRCA_scRNASeq/count_matrix_sparse.mtx',
+  cells = './GSE176078_Wu_etal_2021_BRCA_scRNASeq/Wu_etal_2021_BRCA_scRNASeq/count_matrix_barcodes.tsv',
+  features = './GSE176078_Wu_etal_2021_BRCA_scRNASeq/Wu_etal_2021_BRCA_scRNASeq/count_matrix_genes.tsv',
+  feature.column = 1
+)
+single.cell.metadata <- read.table('./GSE176078_Wu_etal_2021_BRCA_scRNASeq/Wu_etal_2021_BRCA_scRNASeq/metadata.csv', 
+                                   sep = ',',
+                                   header = TRUE, 
+                                   row.names = 1)
+
+single.cell.data = CreateSeuratObject(single.cell.data, 
+                                      project='Wu_dataset', 
+                                      assay='RNA', 
+                                      min.cells = 0, 
+                                      min.features = 1, meta.data = single.cell.metadata)
+```
+
+```{r}
+table(single.cell.data$celltype_major, dnn = list("celltype_major")) %>%
+      as.data.frame(., responseName = "number_cells")
+```
+
+Quality control
+```{r}
+is_outlier <- function(SeuratObject, metric, nmads){
+  eval(parse(text = paste0("M <- SeuratObject$",metric)))
+  outlier <- (M < median(M) - nmads * mad(M)) | (M > median(M) + nmads * mad(M))
+  return(outlier)
+}
+
+check_outliers_nFeature <- is_outlier(single.cell.data, 'nFeature_RNA', 5)
+check_outliers_nCount <- is_outlier(single.cell.data, 'nCount_RNA', 5)
+check_outliers_mito <- is_outlier(single.cell.data, 'percent.mito', 3)
+
+non_outliers_nFeature <- names(check_outliers_nFeature[!check_outliers_nFeature])
+non_outliers_nCount <- names(check_outliers_nCount[!check_outliers_nCount])
+non_outliers_mito <- names(check_outliers_mito[!check_outliers_mito])
+```
+
+```{r}
+non_outliers <- intersect(non_outliers_nFeature, non_outliers_nCount) %>% 
+  intersect(non_outliers_mito)
+
+single.cell.data <- subset(single.cell.data, cells = non_outliers)
+
+as.data.frame(table(single.cell.data$celltype_major, dnn = list("celltype_major")), responseName = "number_cells")
+```
+
+Bulk data
+```{r}
+bulk.data <- read.table('GSE176078_Wu_etal_2021_bulkRNAseq_raw_counts.txt', skip=1)
+
+header <- read.table('GSE176078_Wu_etal_2021_bulkRNAseq_raw_counts.txt', 
+                     header = FALSE, nrows = 1, skipNul = TRUE, sep='\t')
+
+colnames(bulk.data) <- c('Genes', gsub('A|N', '', header[2:25]))
+
+bulk.data <- bulk.data[bulk.data$Genes != '', ]
+bulk.data <- column_to_rownames(bulk.data, 'Genes')
+bulk.data <- as.matrix(bulk.data)
+```
+
+Subsampling of scRNAseq data
+```{r}
+set.seed(42)
+
+max_cells_per_celltype = 100
+
+sampled.metadata <- single.cell.data@meta.data %>%
+      rownames_to_column(., 'barcode') %>%
+      group_by(., celltype_major) %>% 
+      nest() %>%            
+      mutate(n =  map_dbl(data, nrow)) %>%
+      mutate(n = min(n, max_cells_per_celltype)) %>%
+      ungroup() %>% 
+      mutate(samp = map2(data, n, sample_n)) %>% 
+      select(-data) %>%
+      unnest(samp)
+
+single.cell.data.sampled <- subset(single.cell.data, cells = sampled.metadata$barcode)
+
+
+as.data.frame(table(single.cell.data.sampled$celltype_major, dnn = list("celltype_major")), responseName = "number_cells")
+```
+
+```{r}
+counts.matrix <- as.matrix(single.cell.data.sampled@assays$RNA$counts)
+cell.type.annotations <- single.cell.data.sampled$celltype_major
+batch.ids <- single.cell.data.sampled$orig.ident
+```
+
+```{r}
+compute_sc_deconvolution_methods = function(raw_counts, sc_object, cell_annotations, samples_ids, name_object,
+                                            n_cores = NULL, cbsx_name = NULL, cbsx_token = NULL){
+
+  bulk_counts = ADImpute::NormalizeTPM(raw_counts) 
+
+  message("Running second generation cell-type deconvolution methods using scRNAseq\n")
+  
+  if(is.null(n_cores)){
+    n_cores = parallel::detectCores() - 1
+    message("\nUsing ",n_cores, " cores available for running.........................................................\n")
+  }
+  
+  message("\nRunning AutogeneS...............................................................\n")
+  autogenes = deconvolute_autogenes(bulk_gene_expression = bulk_counts, single_cell_object = sc_object,
+                               cell_type_annotations = as.character(cell_annotations), verbose = T)$proportions
+  
+  message("\nRunning BayesPrism...............................................................\n")
+  bayesprism = deconvolute_bayesprism(bulk_gene_expression = raw_counts, single_cell_object = sc_object,
+                                cell_type_annotations = cell_annotations, n_cores = n_cores)$theta 
+  
+  message("\nRunning Bisque...............................................................\n")
+  bisque = deconvolute_bisque(bulk_gene_expression = as.matrix(raw_counts), single_cell_object = sc_object,
+                                  cell_type_annotations = cell_annotations, batch_ids = samples_ids, verbose = T)$bulk_props 
+  
+  
+  message("\nRunning CibersortX...............................................................\n")
+  if(is.null(cbsx_name)&is.null(cbsx_token)){
+    message("CibersortX credentials not given, method will not be used.\n")
+    cibersortx = NULL
+  }else{
+    set_cibersortx_credentials(cbsx_name, cbsx_token)
+    model_cbsx <- omnideconv::build_model(sc_object, as.character(cell_annotations), 
+                                          batch_ids = samples_ids, method = "cibersortx") 
+    cibersortx = deconvolute_cibersortx(bulk_gene_expression = as.matrix(bulk_counts), 
+                                        signature = model_cbsx, verbose = T)
+  }
+  
+  message("\nRunning CPM...............................................................\n")
+  cpm = deconvolute_cpm(bulk_gene_expression = data.frame(raw_counts), single_cell_object = sc_object, no_cores = 4, #raw counts
+                               cell_type_annotations = as.character(cell_annotations), verbose = T)$cellTypePredictions
+  
+  message("\nRunning DWLS...............................................................\n")
+  model_dwls <- omnideconv::build_model_dwls(sc_object, as.character(cell_annotations), 
+                                             batch_ids = samples_ids, dwls_method = "mast_optimized", ncores = n_cores) 
+  deconvolution_dwls = deconvolute_dwls(bulk_gene_expression = bulk_counts, signature = model_dwls, 
+                                        dwls_submethod = "DampenedWLS", verbose = T)
+  
+  message("\nRunning MOMF...............................................................\n")
+  model_momf <- omnideconv::build_model(bulk_gene_expression = raw_counts, sc_object, 
+                                        as.character(cell_annotations), batch_ids = samples_ids, method = "momf") #raw counts 
+  momf = deconvolute_momf(bulk_gene_expression = as.matrix(bulk_counts), single_cell_object = sc_object,
+                                signature = model_momf, method = "KL", verbose = T)
+  
+  message("\nRunning MuSiC...............................................................\n")
+  music = deconvolute_music(bulk_gene_expression = as.matrix(bulk_counts), single_cell_object = sc_object,
+                               cell_type_annotations = cell_annotations,  batch_ids = samples_ids, verbose = T)$Est.prop.weighted
+  
+  message("\nRunning SCDC...............................................................\n")
+  scdc = deconvolute_scdc(bulk_gene_expression = as.matrix(bulk_counts), single_cell_object = sc_object, 
+                          cell_type_annotations = cell_annotations, batch_ids = samples_ids, verbose = T)$prop.est.mvw  
+  
+
+  results = list(AutogeneS = autogenes, BayesPrism = bayesprism, CBSX = cibersortx, CPM = cpm, 
+                 DWLS = deconvolution_dwls, MOMF = momf, MuSic = music, SCDC = scdc)
+  
+
+  results <- lapply(names(results), function(method) {
+    deconv_method <- results[[method]]
+    
+    colnames(deconv_method) <- paste0(method, "_", name_object, "_", colnames(deconv_method))
+    colnames(deconv_method) <- str_replace_all(colnames(deconv_method), " ", "_")
+    
+    return(data_element)
+  })
+  
+  results = do.call(cbind, results)
+  
+  return(results)
+  
+  ### METHODS NOT YET IMPLEMENTED 
+  
+  # 1. BSeq-sc: Need CIBERSORT source code
+  # message("\nRunning BSeq-sc...............................................................\n") 
+  # bseqsc = deconvolute_bseqsc(bulk_gene_expression = as.matrix(bulk.data), single_cell_object = sc_object,
+  #                             cell_type_annotations = cell_annotations, batch_ids = samples_ids, verbose = T)
+  
+  # 2. CDSeq: Crash machine
+  #message("\nRunning CDSeq...............................................................\n") 
+  # cdseq = deconvolute(bulk_gene_expression = raw_counts, single_cell_object = counts.matrix, no_cores = 6, method = "cdseq",
+  #                     cell_type_annotations = cell_annotations, batch_ids = samples_ids, verbose = T)
+  
+  # 3. SCADEN: Takes a lot of time
+  # message("\nRunning Scaden...............................................................\n")
+  # model_scaden <- omnideconv::build_model(bulk_gene_expression = bulk.data, counts.matrix, as.character(cell_annotations), 
+  #                                         batch_ids = samples_ids, method = "scaden") 
+  # scaden = deconvolute_scaden(bulk_gene_expression = bulk_counts, 
+  #                             signature = model_scaden, verbose = T)
+  
+}
+```
+
