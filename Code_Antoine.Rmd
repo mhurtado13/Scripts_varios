@@ -1,0 +1,43 @@
+---
+title: "Code_Antoine"
+output: html_document
+date: "2024-10-25"
+---
+
+```{r}
+library(Seurat)
+mergedDataSet=readRDS(file = "~/Downloads/merged_dataset_clust.rds")
+viper_results=readRDS("~/Downloads/viper_results.rds")
+```
+
+```{r}
+mergedDataSet@assays$TF = CreateAssayObject(counts = viper_results)
+DefaultAssay(mergedDataSet) = 'TF' #specify you want to use the TF matrix
+mergedDataSet@assays$TF@scale.data <- viper_results #Adding the data 
+```
+
+```{r}
+viper_results = viper_results + abs(min(viper_results))
+```
+
+```{r}
+na_index <- rowSums(is.na(viper_results)) > 0 
+
+# Subset the original data frame using the logical index
+rows_with_na <- viper_results[na_index, ]
+
+# Print the row names of the rows containing NA values
+print(rownames(rows_with_na))
+
+viper_results = na.omit(viper_results)
+DefaultAssay(mergedDataSet) = "TF"
+mergedDataSet@assays$TF@key <- "TF_"
+mergedDataSet = FindVariableFeatures(mergedDataSet)
+mergedDataSet <- RunPCA(mergedDataSet, verbose = FALSE)
+ElbowPlot(mergedDataSet, ndims = 10)
+mergedDataSet <- FindNeighbors(mergedDataSet, dims = 1:10, verbose = FALSE, graph.name = c("TF_nn", "TF_snn"))
+mergedDataSet <- FindClusters(mergedDataSet, verbose = FALSE, resolution = 0.3, graph.name = "TF_snn")
+mergedDataSet <- RunUMAP(mergedDataSet, dims = 1:10, verbose = FALSE)
+DimPlot(mergedDataSet, reduction = "umap", label = T) 
+```
+
