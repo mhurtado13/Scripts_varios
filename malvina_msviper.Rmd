@@ -1,0 +1,124 @@
+---
+title: "msVIPER"
+author: "Marcelo Hurtado"
+date: "2024-11-15"
+output: html_document
+---
+
+Input
+```{r}
+library(viper)
+library(dplyr)
+
+gcm_auto <- read.table("~/Downloads/normalized_counts.txt", header = TRUE, row.names = 1)
+
+sample_info = data.frame(
+  Sample = colnames(gcm_auto),
+  Time = as.numeric(sub("J(\\d+)_.*", "\\1", colnames(gcm_auto))),
+  Patient = as.numeric(sub(".*_p(\\d+)_.*", "\\1", colnames(gcm_auto))),
+  Replicate = as.numeric(sub(".*_rep(\\d+)_.*", "\\1", colnames(gcm_auto)))
+)
+
+sample_info <- sample_info[order(sample_info$Patient, sample_info$Replicate, sample_info$Time), ] #what is this doing? Not sure if it is changing something
+```
+
+Malvina's code
+```{r}
+results <- list() # To store msviper results for each comparison
+
+# Loop over each patient and replicate
+for (patient in unique(sample_info$Patient)) {
+  for (rep in unique(sample_info$Replicate)) {
+    # Filter samples for the specific patient and replicate
+    patient_rep_samples <- sample_info %>%
+      filter(Patient == patient & Replicate == rep) %>%
+      arrange(Time)
+    
+    # Loop through each consecutive pair of time points for comparison
+    for (i in 1:(nrow(patient_rep_samples) - 1)) {
+      
+      # Marcelo's comments: Here when you subset per patient, then per replicate and then per time points you end up comparing 1 sample vs 1 sample... is this significant? I guess this is also why ttestNull() is taking so much time, as it is trying to do a NULL distribution using the samples per group. In this case as it is only 1 sample is not making any sense... I propose to subset by patient and time points but keep the replicates so you will have > 1 sample per group 
+      
+      # Define the time points and corresponding groups
+      time1 <- patient_rep_samples$Time[i]
+      time2 <- patient_rep_samples$Time[i + 1]
+      sample1 <- patient_rep_samples$Sample[i]
+      sample2 <- patient_rep_samples$Sample[i + 1]
+      
+      # Subset data for the two time points
+      filtered_data <- gcm_auto[, c(sample1, sample2)] 
+      
+      filtered_data <- filtered_data %>% as.matrix()
+      group_labels <- c(1, 2)
+      
+      # Compute null distribution with N permutations
+      dnull <- ttestNull(filtered_data, group_labels, per=1000)  
+      # Marcelo's comments: I am not exactly sure which structure you are following here, from what i see in the documentation of ttestNull() you can either put
+      # - ttestNull(x, y) where X is the subset matrix with only the samples belonging to group1 and y is the subset matrix with only the samples belonging to group2.
+      # - ttestNull(x, pheno, group1, group2) where X is a ExpressionSet object, where pheno is the column name where the groups labels are, group1 is the value of the test var and group2 the value of the ref var.
+      # So when you put 'ttestNull(filtered_data, group_labels, per=1000)' filtered_data is ok but group_labels i don't think so cause it is only a character vector while ttest() is expecting the subset matrix.
+      # Not sure, maybe you are using another version of viper and the structure has changed? Or maybe I missing something, but when I tried to run this part my computer crashed.
+      
+      # Perform differential expression analysis between time1 and time2
+      sig <- rowTtest(filtered_data)$statistic
+      # Marcelo's comments: Same comments as above regarding the structure of rowTtest(), it expects two matrices one for test and one for ref right?
+
+      # Run msviper analysis using the regulon network
+      mra <- msviper(sig, regulon, dnull)
+      
+      # Save results for this comparison
+      results[[paste("Patient", patient, "Replicate", rep, "Time", time1, "vs", time2, sep = "_")]] <- mra  
+      # Marcelo's comments: Be careful here, mra contains differential active TFs that there are also not significant, you need to take the significant ones before saving it. 
+      
+      # Plot the results for each comparison (optional)
+      plot(mra, cex=.7)
+    }
+  }
+}
+```
+
+Load main function
+```{r setup, include=FALSE}
+#This is the function I did for running msviper. Check it here https://github.com/VeraPancaldiLab/CellTFusion_paper/blob/main/user_projects/src/environment_set.R 
+source("~/diff_analysis.R") #Load function 
+```
+
+Test function (ignored)
+```{r}
+# I will use this function for the code below
+res = diff_analysis(RNA.counts.normalized = gcm_auto, feature = sample_info$Time, test = 1, ref = 4, pval = 0.05, file.name = "Test") #Only a test to check whether it works or not in your data
+```
+
+Marcelo's code
+```{r}
+# Loop over each patient 
+results <- list() #Initialize list to save results
+contador = 1 
+for (patient in unique(sample_info$Patient)) {
+  # Filter samples for the specific patient 
+  patient_rep_samples <- sample_info %>%
+    filter(Patient == patient) %>%
+    arrange(Time)
+  
+  # Filter counts for the specific patient
+  counts_rep_samples = gcm_auto[,patient_rep_samples$Sample]
+  
+  # Loop through each consecutive pair of time points for comparison
+  results_time = list() #Initialize list to save results per time points comparison
+  contador2 = 1
+  timepoints = unique(patient_rep_samples$Time) #As now there are replicates, we use unique() to extract unique time points
+  for (i in 1:(length(timepoints) - 1)) {
+    time1 <- timepoints[i] 
+    time2 <- timepoints[i + 1]
+    results_time[[contador2]] = diff_analysis(counts_rep_samples, patient_rep_samples$Time, test = time1, ref = time2, pval = 0.05, file_name = paste0("Patient",patient, "_TimePoint_", time1, "vs", time2)) #Main function diff_analysis()
+    names(results_time)[contador2] = paste0("TimePoint_", time1, "vs", time2)
+    contador2 = contador2 + 1
+  }
+  
+  #Save results per patient
+  results[[contador]] = results_time
+  names(results)[contador] = paste0("Patient_", patient)
+  contador = contador + 1
+}
+```
+

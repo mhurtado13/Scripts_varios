@@ -1,0 +1,96 @@
+---
+title: "Template_script"
+author: "Marcelo Hurtado"
+date: "2024-04-12"
+output: html_document
+---
+
+This script is used as a template for analyze your data with CellTFusion. The user needs to change the paths to specify the location of the following files: counts, traitData.
+
+Set up environment
+```{r setup, include=FALSE}
+source("src/environment_set.R") #Load functions and packages
+set.seed(123) #For reproducibility
+```
+
+Load data
+```{r}
+counts = read.delim2("~/Downloads/Maha_TPM_normalization_bulk.txt", row.names = 1, sep = ",", header = F) 
+traitData = read.csv("~/Downloads/Mahas_clinical.csv", row.names = 1)
+```
+
+```{r}
+patients = paste0("Patient_" , str_to_upper(as.character(counts[1,])))
+colnames(counts) = patients
+counts = counts[-1,]
+
+for (i in 1:ncol(counts)) {
+  counts[,i] = as.numeric(counts[,i])
+}
+
+traitData$sample = paste0("Patient_", traitData$sample)
+rownames(traitData) = traitData$sample
+traitData$sample = NULL
+
+traitData = traitData[match(colnames(counts), rownames(traitData)),]
+```
+
+0. Deconvolution
+
+- Perform deconvolution using 6 methods and 10 signatures (GEMDeCan). It needs as input raw counts (genes as SYMBOL) and it will ask for your credentials to run CBSX
+```{r}
+deconv = compute.deconvolution(counts, normalized = F, credentials.mail = "marcelo.hurtado@inserm.fr", credentials.token = "734212f6ad77fc4eea2bdb502792f294")
+```
+
+1. TFs inference
+```{r}
+tfs = compute.TFs.activity(counts)
+```
+
+2. TFs network construction
+```{r}
+network = compute.WTCNA(tfs, corr_mod = 0.7, clustering.method = "ward.D2") 
+#Association of TFs modules with clinical data
+compute.metada.association(network[[1]], traitData, pval = 0.05, width = 10) 
+```
+
+3. Modules characterization
+```{r}
+compute.modules.enrichment(counts, tfs, network[[1]], network[[2]])
+```
+
+4. Pathways activity inference
+```{r}
+pathways = compute.pathway.activity(counts)
+#Association of TFs modules with pathways
+compute.modules.relationship(network[[1]], pathways, "Pathways_Progeny-TFs_Modules", width = 15)
+```
+
+5. Deconvolution analysis
+```{r}
+dt = compute.deconvolution.analysis(deconv, corr = 0.7, seed = 123) #seed is restart inside, so it is important to set seed again here to ensure reproducibility
+#Association of TFs modules with deconvolution 
+compute.modules.relationship(network[[1]], dt[[1]], "Deconvolution-TFs_Modules", vertical = T, height = 30, width = 10, pval = 0.05)
+```
+
+6. Identify cell groups from significant deconvolution features across TFs modules
+```{r}
+features = compute.modules.relationship(network[[1]], dt[[1]], return = T)
+cell_dendrograms = identify.cell.groups(features[[1]], features[[2]], height = 20) 
+```
+
+7. Significant cell groups associated with clinical data traits (in this case our trait is "Response")
+```{r}
+res = cell.groups.analysis(dt[[1]], traitData, "progression.1", cell_dendrograms, cut.height = 0.6, stat.test = 'Anova', pval = 0.1, height = 20)
+```
+
+8. Predicting response (or any other trait)
+```{r}
+prediction = compute.ML.models(res[[1]], traitData, "progression.1", "1", k_folds = 10, n_rep = 20, n_top = 3, n_iterations = 20, file_name = "Miner", return_top = T, seed = 123)
+```/*
+
+Save results
+```{r}
+save(res, prediction, file = "results.RData")
+```
+

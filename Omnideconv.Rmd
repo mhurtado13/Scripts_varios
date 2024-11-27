@@ -1,0 +1,138 @@
+---
+title: "Omnideconv"
+output: html_document
+date: "2024-10-16"
+---
+
+```{r}
+library(Seurat)
+library(SeuratDisk)
+library(patchwork)
+library(ggplot2)
+library(dplyr)
+set.seed(123)
+```
+
+```{r}
+counts = read.csv("~/Downloads/RawFiles/Counts_Vanderbilt.csv", row.names = 1) 
+sc_rnaseq = LoadH5Seurat("~/all_samples.h5seurat",  assays = "RNA")
+sc_rnaseq <- subset(sc_rnaseq, subset = n_genes > 200 & total_counts < 2500 & pct_counts_mt < 5)
+```
+
+```{r}
+library(stringr)
+rownames(counts) <- str_replace(rownames(counts),
+                        pattern = ".[0-9]+$",
+                        replacement = "")
+```
+
+Extract only coding genes
+```{r}
+library(biomaRt)
+
+mart <- useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+
+gene_ids <- rownames(counts)
+
+# Get gene type annotations
+annotations <- getBM(attributes = c("ensembl_gene_id", "gene_biotype"), 
+                     filters = "ensembl_gene_id", 
+                     values = gene_ids, 
+                     mart = mart)
+
+# Filter annotations to keep only coding genes
+coding_genes <- annotations %>%
+  filter(gene_biotype == "protein_coding") %>%
+  pull(ensembl_gene_id)
+
+counts = counts[rownames(counts) %in% coding_genes,]
+
+# Change to gene SYMBOL
+library(org.Hs.eg.db)
+library(plotly)
+library(tibble)
+
+entrz <- AnnotationDbi::select(org.Hs.eg.db, keys = rownames(counts), columns = "SYMBOL", keytype = "ENSEMBL") %>%
+  distinct(SYMBOL, .keep_all=T) %>%
+  filter(ENSEMBL %in% rownames(counts)) %>%
+  group_by(ENSEMBL) %>%
+  slice(1) %>%
+  ungroup()
+
+counts = counts %>%
+  rownames_to_column("Genes") %>%
+  filter(Genes %in% entrz$ENSEMBL) %>%
+  mutate(Symbol = entrz$SYMBOL) %>%
+  na.omit() %>%
+  remove_rownames() %>%
+  column_to_rownames("Symbol") %>%
+  dplyr::select(-Genes)
+
+# Get gene type annotations
+annotations_symbol <- getBM(attributes = c("hgnc_symbol", "gene_biotype"),
+                     filters = "hgnc_symbol",
+                     values = rownames(counts),
+                     mart = mart)
+
+# Filter annotations to keep only coding genes
+coding_genes <- annotations_symbol %>%
+  filter(gene_biotype == "protein_coding") %>%
+  pull(hgnc_symbol)
+
+counts = counts[rownames(counts) %in% coding_genes,]
+```
+
+
+```{r}
+single_cell_object = as.matrix(sc_rnaseq@assays$RNA@data)
+cell_type_annotations = sc_rnaseq@meta.data$annotated_ct
+batch_ids = sc_rnaseq@meta.data$sample
+
+rm(sc_rnaseq)
+gc()
+```
+
+Build model
+```{r}
+library(omnideconv)
+signature <- omnideconv::build_model(single_cell_object, cell_type_annotations,
+                                     batch_ids, method = "dwls", dwls_method = 'mast_optimized')
+```
+
+Deconvolve mixture
+```{r}
+deconvolution <- omnideconv::deconvolute(bulk_gene_expression = counts, model = signature,
+                                         method = "dwls", dwls_submethod = "DampenedWLS", verbose = T)
+```
+
+Test signature
+```{r}
+sig_file = read.delim2('../Documents/CellTFusion/user_projects/src/signatures/CBSX-Melanoma-scRNAseq.txt')
+genes = sig_file$NAME
+
+sig_file <- sig_file %>%
+  column_to_rownames("NAME") %>%
+  apply(., 2, as.numeric) %>%
+  data.frame() %>%
+  mutate("Genes" = genes) %>%
+  column_to_rownames("Genes") %>%
+  as.matrix()
+
+```
+
+AutoGeneS
+```{r}
+signature_autogenes <- omnideconv::build_model(single_cell_object, cell_type_annotations,
+                                     batch_ids, method = "autogenes")
+deconvolution <- omnideconv::deconvolute(bulk_gene_expression = counts, model = sig_file,
+                                         method = "autogenes", verbose = T)
+deconvolute_autogenes()
+```
+
+
+DWLS
+```{r}
+deconvolution <- omnideconv::deconvolute(bulk_gene_expression = counts, model = sig_file,
+                                         method = "dwls", dwls_submethod = "DampenedWLS", verbose = T)
+```
+
