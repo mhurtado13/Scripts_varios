@@ -1,0 +1,84 @@
+---
+title: "BEATAML"
+output: html_document
+date: "2024-11-06"
+---
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+
+deconv = read.csv("../../Downloads/Results_AML/Deconvolution_after_subgrouping.csv", row.names = 1)
+coldata = read.csv("../../Downloads/Clinical_AML.csv") %>%
+  filter(dbgap_rnaseq_sample != "") %>%
+  filter(dbgap_rnaseq_sample %in% rownames(deconv)) %>%
+  tibble::column_to_rownames("dbgap_rnaseq_sample") 
+
+deconv = deconv[rownames(coldata),]
+identical(rownames(deconv), rownames(coldata))
+```
+
+Monocytes - Correlation plots 
+```{r}
+monocytes = deconv[,grep("Monocytes", colnames(deconv))]
+prop_mono = coldata$X..Monocytes.in.PB
+
+for (i in 1:ncol(monocytes)) {
+  name_method = colnames(monocytes)[i]
+  data = data.frame("Deconvolution" = monocytes[,i], 
+                    "Groundtruth" = prop_mono)
+  # Calculate correlation
+  cor_test <- cor.test(data[,"Deconvolution"], data[,"Groundtruth"], method = "pearson")
+  
+  # Extract r and p-value
+  r_value <- round(cor_test$estimate, 2)
+  p_value <- signif(cor_test$p.value, 2)
+  
+  # Create regression plot with ggplot2
+  p = ggplot(data, aes_string(x = "Deconvolution", y = "Groundtruth")) +
+      geom_point() +  # Scatter plot
+      geom_smooth(method = "lm", color = "blue", se = FALSE) +  # Linear regression line
+      labs(x = name_method, y = "Groundtruth", title = "Monocytes correlation") +
+      annotate("text", x = Inf, y = Inf, hjust = 1.1, vjust = 2.5,
+               label = paste("r =", r_value, "\np =", p_value),
+               size = 4, color = "black") +
+      theme_minimal()
+  
+  print(p)
+}
+
+
+```
+
+Neutrophils - Correlation plots 
+```{r}
+neutrophils = deconv[,grep("Neutrophils", colnames(deconv))]
+prop_neu = coldata$X..Neutrophils.in.PB
+
+for (i in 1:ncol(neutrophils)) {
+  name_method = colnames(neutrophils)[i]
+  data = data.frame("Deconvolution" = neutrophils[,i], 
+                    "Groundtruth" = prop_neu)
+  # Calculate correlation
+  cor_test <- cor.test(data[,"Deconvolution"], data[,"Groundtruth"], method = "pearson")
+  
+  # Extract r and p-value
+  r_value <- round(cor_test$estimate, 2)
+  p_value <- signif(cor_test$p.value, 2)
+  
+  # Create regression plot with ggplot2
+  p = ggplot(data, aes_string(x = "Deconvolution", y = "Groundtruth")) +
+      geom_point() +  # Scatter plot
+      geom_smooth(method = "lm", color = "blue", se = FALSE) +  # Linear regression line
+      labs(x = name_method, y = "Groundtruth", title = "Neutrophils correlation") +
+      annotate("text", x = Inf, y = Inf, hjust = 1.1, vjust = 1.5,
+               label = paste("r =", r_value, "\np =", p_value),
+               size = 4, color = "black") +
+      theme_minimal()
+  
+  print(p)
+}
+
+
+```
