@@ -1,0 +1,21 @@
+---
+title: "MIRACLE"
+author: "Marcelo Hurtado"
+date: "2024-11-29"
+output: html_document
+---
+
+Set up environment
+```{r setup, include=FALSE}
+source("src/environment_set.R") #Load functions and packages
+set.seed(123) #For reproducibility
+```
+
+Input files
+```{r}
+counts.norm = read.csv("~/Downloads/salmon.merged.gene_tpm.tsv", sep = "\t", row.names = 1)
+counts.norm$gene_name = NULL
+counts.norm = convert_ensembl_symbol(counts.norm)
+deconv = compute.deconvolution(counts.norm, normalized = F, methods = "Epidish", file_name = "IMMUCAN")
+```
+
