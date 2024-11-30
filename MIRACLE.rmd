@@ -16,6 +16,12 @@ Input files
 counts.norm = read.csv("~/Downloads/salmon.merged.gene_tpm.tsv", sep = "\t", row.names = 1)
 counts.norm$gene_name = NULL
 counts.norm = convert_ensembl_symbol(counts.norm)
-deconv = compute.deconvolution(counts.norm, normalized = F, methods = "Epidish", file_name = "IMMUCAN")
+counts.norm = counts.norm[,-which(colnames(counts.norm)%in%"Undetermined_S0")]
 ```
+
+CellTFusion
+```{r}
+res = CellTFusion(counts.norm, normalized = F, cbsx.mail = "marcelo.hurtado@inserm.fr", cbsx.token = "734212f6ad77fc4eea2bdb502792f294", file_name = "MIRACLE")
+```
+
 
