@@ -4,152 +4,6 @@ output: html_document
 date: "2024-10-24"
 ---
 
-Functions
-```{r}
-compute.TFs.activity <- function(RNA.counts, TF.collection = "CollecTRI", min_targets_size = 5, tfs.pruned = FALSE){
-  
-  tfs2viper_regulons <- function(df){
-    regulon_list <- split(df, df$source)
-    regulons <- lapply(regulon_list, function(regulon) {
-      tfmode <- stats::setNames(regulon$mor, regulon$target)
-      list(tfmode = tfmode, likelihood = rep(1, length(tfmode)))
-    })
-    return(regulons)}
-  
-  if(tfs.pruned==T){
-    cat("Pruned TFs is set to TRUE. Please specify the maximun size of targets allowed/n")
-    max_size_targets = as.numeric(readline(prompt = "Maximun size of TFs-targets: "))
-  }
-  
-  if(TF.collection == "CollecTRI"){
-    net = decoupleR::get_collectri(organism = 'human', split_complexes = F)
-    net_regulons = tfs2viper_regulons(net)
-  } else if(TF.collection == "Dorothea"){
-    net = decoupleR::get_dorothea(organism = 'human', levels = c("A", "B", "C", "D"))
-    net_regulons = tfs2viper_regulons(net)
-  } 
-  
-  if(TF.collection == "ARACNE"){
-    cat("For ARACNE analysis you need to specify the path of your network file. Remember this file should be a 3 columns text file, with regulator in the first column, target in the second and mutual information in the third column")
-    network_file = readline(prompt = "Path for network file from aracne (no quotes): ")
-    net_regulons <- aracne2regulon(network_file, as.matrix(RNA.counts), format = "3col")
-  }
-  
-  if(tfs.pruned == TRUE){
-    net_regulons = pruneRegulon(net_regulons, cutoff = max_size_targets)
-  }
-  
-  sample_acts <- viper(as.matrix(RNA.counts), net_regulons, minsize = min_targets_size, verbose=F, method = "none")
-  message("TFs scores computed")
-  
-  return(data.frame(t(sample_acts)))
-  
-}
-
-compute_sc_deconvolution_methods = function(raw_counts, sc_object, cell_annotations, samples_ids, name_object, normalized = T,
-                                            n_cores = NULL, cbsx_name = NULL, cbsx_token = NULL){
-  
-  if(normalized){
-    bulk_counts = ADImpute::NormalizeTPM(raw_counts) 
-  }else{ 
-    bulk_counts = raw_counts
-  }
-  
-  
-  if(is.null(n_cores)){
-    n_cores = parallel::detectCores() - 1
-    message("\nUsing ",n_cores, " cores available for running.........................................................\n")
-  }
-  
-  message("\nRunning AutogeneS...............................................................\n")
-  autogenes = deconvolute_autogenes(bulk_gene_expression = bulk_counts, single_cell_object = sc_object,
-                                    cell_type_annotations = as.character(cell_annotations), verbose = T)$proportions
-  
-  message("\nRunning BayesPrism...............................................................\n")
-  bayesprism = deconvolute_bayesprism(bulk_gene_expression = raw_counts, single_cell_object = sc_object,
-                                      cell_type_annotations = cell_annotations, n_cores = n_cores)$theta 
-  
-  message("\nRunning Bisque...............................................................\n")
-  bisque = deconvolute_bisque(bulk_gene_expression = as.matrix(raw_counts), single_cell_object = sc_object,
-                              cell_type_annotations = cell_annotations, batch_ids = samples_ids, verbose = T)$bulk_props 
-  
-  
-  message("\nRunning CibersortX...............................................................\n")
-  if(is.null(cbsx_name)&is.null(cbsx_token)){
-    message("CibersortX credentials not given, method will not be used.\n")
-    cibersortx = NULL
-  }else{
-    set_cibersortx_credentials(cbsx_name, cbsx_token)
-    model_cbsx <- omnideconv::build_model(sc_object, as.character(cell_annotations), 
-                                          batch_ids = samples_ids, method = "cibersortx") 
-    cibersortx = deconvolute_cibersortx(bulk_gene_expression = as.matrix(bulk_counts), 
-                                        signature = model_cbsx, verbose = T)
-  }
-  
-  message("\nRunning CPM...............................................................\n")
-  cpm = deconvolute_cpm(bulk_gene_expression = data.frame(raw_counts), single_cell_object = sc_object, no_cores = 4, #raw counts
-                        cell_type_annotations = as.character(cell_annotations), verbose = T)$cellTypePredictions
-  
-  message("\nRunning DWLS...............................................................\n")
-  model_dwls <- omnideconv::build_model_dwls(sc_object, as.character(cell_annotations), 
-                                             batch_ids = samples_ids, dwls_method = "mast_optimized", ncores = n_cores) 
-  deconvolution_dwls = deconvolute_dwls(bulk_gene_expression = bulk_counts, signature = model_dwls, 
-                                        dwls_submethod = "DampenedWLS", verbose = T)
-  
-  message("\nRunning MOMF...............................................................\n")
-  model_momf <- omnideconv::build_model(bulk_gene_expression = raw_counts, sc_object, 
-                                        as.character(cell_annotations), batch_ids = samples_ids, method = "momf") #raw counts 
-  momf = deconvolute_momf(bulk_gene_expression = as.matrix(bulk_counts), single_cell_object = sc_object,
-                          signature = model_momf, method = "KL", verbose = T)
-  
-  message("\nRunning MuSiC...............................................................\n")
-  music = deconvolute_music(bulk_gene_expression = as.matrix(bulk_counts), single_cell_object = sc_object,
-                            cell_type_annotations = cell_annotations,  batch_ids = samples_ids, verbose = T)$Est.prop.weighted
-  
-  message("\nRunning SCDC...............................................................\n")
-  scdc = deconvolute_scdc(bulk_gene_expression = as.matrix(bulk_counts), single_cell_object = sc_object, 
-                          cell_type_annotations = cell_annotations, batch_ids = samples_ids, verbose = T)$prop.est.mvw  
-  
-  
-  results = list(AutogeneS = autogenes, BayesPrism = bayesprism, CBSX = cibersortx, CPM = cpm, 
-                 DWLS = deconvolution_dwls, MOMF = momf, MuSic = music, SCDC = scdc)
-  
-  
-  results <- lapply(names(results), function(method) {
-    deconv_method <- results[[method]]
-    
-    colnames(deconv_method) <- paste0(method, "_", name_object, "_", colnames(deconv_method))
-    colnames(deconv_method) <- str_replace_all(colnames(deconv_method), " ", "_")
-    
-    return(data_element)
-  })
-  
-  results = do.call(cbind, results)
-  
-  return(results)
-  
-  ### METHODS NOT YET IMPLEMENTED 
-  
-  # 1. BSeq-sc: Need CIBERSORT source code
-  # message("\nRunning BSeq-sc...............................................................\n") 
-  # bseqsc = deconvolute_bseqsc(bulk_gene_expression = as.matrix(bulk.data), single_cell_object = sc_object,
-  #                             cell_type_annotations = cell_annotations, batch_ids = samples_ids, verbose = T)
-  
-  # 2. CDSeq: Crash machine
-  #message("\nRunning CDSeq...............................................................\n") 
-  # cdseq = deconvolute(bulk_gene_expression = raw_counts, single_cell_object = counts.matrix, no_cores = 6, method = "cdseq",
-  #                     cell_type_annotations = cell_annotations, batch_ids = samples_ids, verbose = T)
-  
-  # 3. SCADEN: Takes a lot of time
-  # message("\nRunning Scaden...............................................................\n")
-  # model_scaden <- omnideconv::build_model(bulk_gene_expression = bulk.data, counts.matrix, as.character(cell_annotations), 
-  #                                         batch_ids = samples_ids, method = "scaden") 
-  # scaden = deconvolute_scaden(bulk_gene_expression = bulk_counts, 
-  #                             signature = model_scaden, verbose = T)
-  
-}
-```
-
 ```{r}
 library(Seurat)
 library(SeuratDisk)
@@ -160,88 +14,83 @@ library(omnideconv)
 library(viper)
 library(decoupleR)
 set.seed(123)
-#counts = read.csv("~/Downloads/RawFiles/Counts_Vanderbilt.csv", row.names = 1) 
-#seurat_anndata = LoadH5Seurat("~/all_samples.h5seurat",  assays = "RNA")
-inputs_dir <- system.file("extdata", package = "decoupleR")
-data <- readRDS(file.path(inputs_dir, "sc_data.rds"))
+seurat_anndata = LoadH5Seurat("~/all_samples.h5seurat",  assays = "RNA")
 ```
 
 UMAP clustering
 ```{r}
-# Idents(seurat_anndata) = seurat_anndata@meta.data$annotated_ct
-# DimPlot(seurat_anndata, reduction="umap", label = T)
-p <- Seurat::DimPlot(data, 
-                     reduction = "umap", 
-                     label = TRUE, 
-                     pt.size = 0.5) + 
-     Seurat::NoLegend()
-
-p
-data@meta.data$cell.annot = Idents(data)
+Idents(seurat_anndata) = seurat_anndata@meta.data$annotated_ct
+DimPlot(seurat_anndata, reduction="umap", label = T)
 ```
 
-Cell proportions 
+Metacells
 ```{r}
-table(Idents(data)) # how many cells in each cluster
-table(data$orig.ident) # how many cells per patient
-table(Idents(data), data$orig.ident) # how many cells per patient in each cluster
-DataClustTable = table(Idents(data), data$orig.ident) #Create data frame with number of cells per patient in each cluster
-DataClustPercPat = prop.table(table(Idents(data), data$orig.ident), margin = 2) #Create data frame with proportion of cells per patient in each cluster
+library(hdWGCNA)
 
-#Create data frame with proportions
-#DataClustPercPat = data.frame(DataClustPercPat)
-#colnames(DataClustPercPat) = c("NK_Cluster", "PatientID", "CellProportion")
+data <- SetupForWGCNA(
+  seurat_anndata,
+  gene_select = "fraction", # the gene selection approach
+  fraction = 0.05, # fraction of cells that a gene needs to be expressed in order to be included
+  wgcna_name = "MetaCells" # the name of the hdWGCNA experiment
+)
+
+rm(seurat_anndata)
+gc()
+
+# construct metacells  in each group
+seurat_obj <- MetacellsByGroups(
+  seurat_obj = data,
+  min_cells = 100,
+  group.by = c("annotated_ct", "sample"), # specify the columns in seurat_obj@meta.data to group by
+  reduction = 'pca', # select the dimensionality reduction to perform KNN on
+  k = 25, # nearest-neighbors parameter
+  max_shared = 15, # maximum number of shared cells between two metacells
+  ident.group = 'annotated_ct' 
+)
+
+rm(data)
+gc()
+
+metacell_obj <- GetMetacellObject(seurat_obj)
+
+rm(seurat_obj)
+gc()
 ```
 
-Plot cell proportions
+Subset each cluster and compute TF activity
 ```{r}
-##Prepare data
-data = list()
-for (i in 1:length(proportions)){
-  data[[i]] = data.frame("Sample" = rep(names(proportions)[i], length(cell_types)),
-                    "Cells_types" = cell_types,
-                    "Value" = unname(proportions[[i]]))}
-data = bind_rows(data)
+source("compute.TFs.activity.R")
+cell_clusters = list()
+iter = 1
+for (i in unique(metacell_obj@meta.data$annotated_ct)) {
+  cluster = subset(metacell_obj, idents = i, invert = FALSE)
+  cell_clusters[[iter]] = compute.TFs.activity(as.matrix(cluster@assays$RNA@data))
+  names(cell_clusters)[iter] = i
+  iter = iter + 1
+}
 
-p1 = ggplot(data) +
-  geom_bar(aes(x = Sample, y = Value, fill = Cells_types), 
-           position = "stack", stat = "identity")
-p1
+rm(metacell_obj, cluster)
+gc()
 ```
 
-Subset cells
+Recreate sc_counts from TFs
 ```{r}
-B = subset(data, idents = "B", invert = FALSE)
-NK = subset(data, idents = "NK", invert = FALSE)
-CD8 = subset(data, idents = "CD8 T", invert = FALSE)
-CD14 = subset(data, idents = "CD14+ Mono", invert = FALSE)
-CD4_naive = subset(data, idents = "Naive CD4 T", invert = FALSE)
-DC = subset(data, idents = "DC", invert = FALSE)
-CD4_memory = subset(data, idents = "Memory CD4 T", invert = FALSE)
-FCGR3A = subset(data, idents = "FCGR3A+ Mono", invert = FALSE)
-
-B_counts = as.matrix(B@assays$RNA@data)
-NK_counts = as.matrix(NK@assays$RNA@data)
-CD8_counts = as.matrix(CD8@assays$RNA@data)
-CD14_counts = as.matrix(CD14@assays$RNA@data)
-CD4_naive_counts = as.matrix(CD4_naive@assays$RNA@data)
-DC_counts = as.matrix(DC@assays$RNA@data)
-CD4_memory_counts = as.matrix(CD4_memory@assays$RNA@data)
-FCGR3A_counts = as.matrix(FCGR3A@assays$RNA@data)
+tfs_scores = do.call(rbind, cell_clusters)
+cell_annotations = c()
+for (i in 1:length(cell_clusters)) {
+  cell = c(rep(names(cell_clusters)[i], nrow(cell_clusters[[i]])))
+  cell_annotations = c(cell_annotations, cell)
+}
 ```
 
-Running viper
+Create signature
 ```{r}
-B_tfs = compute.TFs.activity(B_counts)
-NK_tfs = compute.TFs.activity(NK_counts)
-CD8_tfs = compute.TFs.activity(CD8_counts)
-CD14_tfs = compute.TFs.activity(CD14_counts)
-CD4_naive_tfs = compute.TFs.activity(CD4_naive_counts)
-DC_tfs = compute.TFs.activity(DC_counts)
-CD4_memory_tfs = compute.TFs.activity(CD4_memory_counts)
-FCGR3A_tfs = compute.TFs.activity(FCGR3A_counts)
-
-tfs = rbind(B_tfs, NK_tfs, CD8_tfs, CD14_tfs, CD4_naive_tfs, DC_tfs, CD4_memory_tfs, FCGR3A_tfs)
+library(omnideconv)
+set_cibersortx_credentials("marcelo.hurtado@inserm.fr", "734212f6ad77fc4eea2bdb502792f294")
+model_cbsx <- omnideconv::build_model(tfs_scores, as.character(cell_annotations), 
+                                      batch_ids = samples_ids, method = "cibersortx") 
+cibersortx = deconvolute_cibersortx(bulk_gene_expression = as.matrix(bulk_counts), 
+                                    signature = model_cbsx, verbose = T)
 ```
 
 Re-clustering
@@ -263,45 +112,36 @@ Idents(data) = data@meta.data$cell.annot
 DimPlot(data, reduction="umap", label = T, pt.size = 1.5)
 ```
 
-Metacells
+PSEUDOBULK
 ```{r}
-library(WGCNA)
-library(hdWGCNA)
+library(SingleCellExperiment)
+library(glmGamPoi)
+sce = as.SingleCellExperiment(seurat_anndata)
+##Aggregating counts
+aggr_counts <- glmGamPoi::pseudobulk(sce, group_by = vars(sample), aggregation_functions = list(counts = "rowMeans2", .default = "rowMeans2")) 
+pseudo_counts = data.frame(aggr_counts@assays@data$counts) 
+pseudo_counts = ADImpute::NormalizeTPM(pseudo_counts) %>%
+  data.frame()
 
-data <- SetupForWGCNA(
-  data,
-  gene_select = "fraction", # the gene selection approach
-  fraction = 0.05, # fraction of cells that a gene needs to be expressed in order to be included
-  wgcna_name = "MetaCells" # the name of the hdWGCNA experiment
-)
-
-# construct metacells  in each group
-seurat_obj <- MetacellsByGroups(
-  seurat_obj = data,
-  min_cells = 10,
-  group.by = c("cell.annot"), # specify the columns in seurat_obj@meta.data to group by
-  reduction = 'umap', # select the dimensionality reduction to perform KNN on
-  k = 5, # nearest-neighbors parameter
-  max_shared = 10, # maximum number of shared cells between two metacells
-  ident.group = 'cell.annot' # set the Idents of the metacell seurat object
-)
-
-# normalize metacell expression matrix:
-seurat_obj <- NormalizeMetacells(seurat_obj)
-```
-Process metacells
-```{r}
-seurat_obj <- ScaleMetacells(seurat_obj, features=VariableFeatures(seurat_obj))
-seurat_obj <- RunPCAMetacells(seurat_obj, features=VariableFeatures(seurat_obj))
-seurat_obj <- RunHarmonyMetacells(seurat_obj, group.by.vars='cell.annot')
-seurat_obj <- RunUMAPMetacells(seurat_obj, reduction='harmony', dims=1:15)
-
-DimPlotMetacells(seurat_obj, group.by='cell.annot') + umap_theme() + ggtitle("Cell Type")
+source("../CellTFusion_paper/user_projects/src/cell_deconvolution.R")
+deconv = compute.deconvolution(pseudo_counts, normalized = F, credentials.mail = "marcelo.hurtado@inserm.fr", 
+                               credentials.token = "734212f6ad77fc4eea2bdb502792f294", 
+                               doParallel = T, workers = 3, file_name = "Pseudobulk")
 ```
 
-```{r}
-metacell_obj <- GetMetacellObject(seurat_obj)
-dat = as.matrix(seurat_obj@assays$RNA@data)
+GROUNDTRUTH
 
+Cell proportions 
+```{r}
+table(Idents(data)) # how many cells in each cluster
+table(data$orig.ident) # how many cells per patient
+table(Idents(data), data$orig.ident) # how many cells per patient in each cluster
+DataClustTable = table(Idents(data), data$orig.ident) #Create data frame with number of cells per patient in each cluster
+DataClustPercPat = data.frame(prop.table(table(Idents(data), data$orig.ident), margin = 2)) #Create data frame with proportion of cells per patient in each cluster
 ```
 
+Groundtruth vs scRNASeq 
+```{r}
+source('pseudobulk_function.R')
+corr_matrix = benchmarking_deconvolution(deconv, cells_groundtruth, file_name = "Benchmark_plot_pseudobulk_Vanderbilt_pearson", corr_type = "pearson")
+```
