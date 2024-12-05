@@ -1,0 +1,31 @@
+---
+title: "Methylation"
+output: html_document
+date: "2024-12-05"
+---
+
+Read methyl reference
+```{r}
+ref = readRDS("../../starting_kit_phase2-3/data/reference_pdac.rds")
+methyl = ref[["ref_met"]]
+```
+
+Read RDS file
+```{r}
+ref_modules = readRDS("ref_modules.rds")
+```
+
+Groundtruth vs MEmatrix 
+```{r}
+methyl <- methyl[,order(colnames(methyl)),  drop = FALSE]
+ref_modules <- ref_modules[,order(colnames(ref_modules)), drop = FALSE]
+```
+
+Compute association
+```{r}
+source("src/environment_set.R")
+corr_matrix = compute.modules.relationship(t(ref_modules), t(methyl), "Groundtruth-Methyl_Modules", width = 8, height = 20, pval = 1, return = T)
+ref = corr_matrix[[1]] + abs(min(corr_matrix[[1]]))
+ref = minMax(ref)
+saveRDS(ref, "ref_modules.rds")
+```

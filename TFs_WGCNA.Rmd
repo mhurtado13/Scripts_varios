@@ -1,0 +1,146 @@
+---
+title: "WGCNA_TFs"
+output: html_document
+date: "2024-12-04"
+---
+
+Read RDS file
+```{r}
+library(Seurat)
+seuratobject = readRDS("scRNAseq_integrated.rds")
+
+DefaultAssay(seuratobject) = "RNA"
+Idents(seuratobject) = seuratobject@meta.data$cell.annot
+```
+
+Pseudobulk
+```{r}
+library(SingleCellExperiment)
+library(glmGamPoi)
+library(dplyr)
+sce = as.SingleCellExperiment(seuratobject)
+##Aggregating counts
+aggr_counts <- glmGamPoi::pseudobulk(sce, group_by = vars(orig.ident), aggregation_functions = list(counts = "rowSums2", .default = "rowMeans2")) 
+pseudo_counts = data.frame(aggr_counts@assays@data$counts) 
+pseudo_counts = ADImpute::NormalizeTPM(pseudo_counts, log = T) %>%
+  data.frame()
+```
+
+Compute TFs activities in pseudocounts
+```{r}
+source("src/environment_set.R")
+net = decoupleR::get_collectri(organism = 'human', split_complexes = F)
+tfs_pseudo = compute.TFs.activity(pseudo_counts, universe = net)
+```
+
+Compute WTCNA
+```{r}
+network = compute.WTCNA(tfs_pseudo, corr_mod = 0.9, clustering.method = "ward.D2") 
+saveRDS(network, "network_modules.rds")
+```
+
+GROUNDTRUTH
+
+Cell proportions 
+```{r}
+Idents(seuratobject) = seuratobject@meta.data$cell.annot
+table(Idents(seuratobject)) # how many cells in each cluster
+table(seuratobject$orig.ident) # how many cells per patient
+table(Idents(seuratobject), seuratobject$orig.ident) # how many cells per patient in each cluster
+DataClustTable = table(Idents(seuratobject), seuratobject$orig.ident) #Create data frame with number of cells per patient in each cluster
+DataClustPercPat = data.frame(prop.table(table(Idents(seuratobject), seuratobject$orig.ident), margin = 2)) #Create data frame with proportion of cells per patient in each cluster
+colnames(DataClustPercPat) = c("Cell_type", "Sample", "Proportion")
+cells_groundtruth = DataClustPercPat
+
+#Collapse groundtruth
+library(dplyr)
+cells_groundtruth <- cells_groundtruth %>%
+  tidyr::pivot_wider(
+    names_from = Cell_type,  
+    values_from = Proportion 
+  ) %>%
+  tibble::column_to_rownames("Sample")
+```
+
+Groundtruth vs MEmatrix 
+```{r}
+cells_groundtruth <- cells_groundtruth[order(rownames(cells_groundtruth)), , drop = FALSE]
+MEmatrix <- network$`TFs module matrix`[order(rownames(network$`TFs module matrix`)), , drop = FALSE]
+```
+
+Compute association
+```{r}
+compute.modules.relationship(MEmatrix, cells_groundtruth, "Groundtruth-TFs_Modules", width = 8, height = 20, pval = 1)
+corr_matrix = compute.modules.relationship(MEmatrix, cells_groundtruth, "Groundtruth-TFs_Modules", width = 8, height = 20, pval = 1, return = T)
+ref = corr_matrix[[1]] + abs(min(corr_matrix[[1]]))
+#ref = minMax(ref)
+saveRDS(ref, "ref_modules.rds")
+```
+
+Deconvolve in bulk sample
+```{r}
+tfs_pseudo = compute.TFs.activity(pseudo_counts, universe = net)
+TF.matrix_simulated = create_tfs_modules(tfs_pseudo, network)
+TF.matrix_simulated = minMax(TF.matrix_simulated)
+set_cibersortx_credentials("marcelo.hurtado@inserm.fr", "734212f6ad77fc4eea2bdb502792f294")
+deconv_pseudo = deconvolute_cibersortx(bulk_gene_expression = t(TF.matrix_simulated), 
+                                    signature = ref, verbose = T)
+```
+
+Groundtruth vs Deconvolution 
+```{r}
+cells_groundtruth <- cells_groundtruth[order(rownames(cells_groundtruth)), , drop = FALSE]
+deconv_pseudo <- deconv_pseudo[order(rownames(deconv_pseudo)), , drop = FALSE]
+```
+
+Correlation plots
+```{r}
+library(ggplot2)
+for (cell in colnames(deconv_pseudo)) {
+  data = data.frame("Deconvolution" = deconv_pseudo[,cell], 
+                    "Groundtruth" = cells_groundtruth[,cell])
+  # Calculate correlation
+  cor_test <- cor.test(data[,"Deconvolution"], data[,"Groundtruth"], method = "spearman")
+    
+  # Extract r and p-value
+  r_value <- round(cor_test$estimate, 2)
+  p_value <- signif(cor_test$p.value, 2)
+    
+  # Create regression plot with ggplot2
+  p = ggplot(data, aes_string(x = "Deconvolution", y = "Groundtruth")) +
+      geom_point() +  # Scatter plot
+      geom_smooth(method = "lm", color = "blue", se = FALSE) +  # Linear regression line
+      labs(x = "Deconvolution", y = "Groundtruth", title = paste0("Estimation of ", cell)) +
+      annotate("text", x = Inf, y = Inf, hjust = 1.1, vjust = 2.5,
+               label = paste("r =", r_value, "\np =", p_value),
+               size = 4, color = "black") +
+      theme_minimal()
+  
+  print(p)
+}
+```
+
+Heatmap correlation
+```{r}
+cor_matrix <- cor(deconv_pseudo, cells_groundtruth)
+library(pheatmap)
+pheatmap(cor_matrix,
+         cluster_rows = TRUE,  # Cluster rows
+         cluster_cols = TRUE,  # Cluster columns
+         display_numbers = TRUE, # Show correlation values
+         color = colorRampPalette(c("blue", "white", "red"))(50), # Define color scale
+         main = "Correlation Heatmap")
+```
+
+Distance
+```{r}
+dist_matrix <- 1- cor_matrix
+
+pheatmap(dist_matrix,
+         cluster_rows = TRUE,  # Cluster rows
+         cluster_cols = TRUE,  # Cluster columns
+         display_numbers = TRUE, # Show distance values
+         color = colorRampPalette(c("white", "orange", "darkred"))(50), # Define color scale
+         main = "Distance Heatmap")
+```
+

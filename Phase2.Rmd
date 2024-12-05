@@ -1,0 +1,46 @@
+---
+title: "Phase2"
+output: html_document
+date: "2024-12-04"
+---
+
+Input
+```{r}
+model = readRDS("Reference_cbsx_TF.rds")
+```
+
+Mixtures matrices
+```{r}
+db=list.files("~/Documents/starting_kit_phase2-3/data/",full.names = T)
+mixtures = list()
+for(i in 1:length(db)){
+  mixtures[[i]] = readRDS(db[[i]])[["mix_rna"]] 
+}
+```
+
+Deconvolve
+```{r}
+deconv = list()
+net = decoupleR::get_collectri(organism = 'human', split_complexes = F)
+for (i in 1:length(mixtures)) {
+  tfs_bulk = compute.TFs.activity(mixtures[[i]], universe = net) 
+  tfs_bulk = t(tfs_bulk)
+  tfs_bulk = abs(tfs_bulk)
+  deconv[[i]] = deconvolute_cibersortx(bulk_gene_expression = as.matrix(tfs_bulk), 
+                                      signature = model, verbose = T)
+}
+```
+
+Test submission script
+```{r}
+net = decoupleR::get_collectri(organism = 'human', split_complexes = F)
+mix = readRDS("../../starting_kit_phase2-3/data/mixes1_VIVO_pdac.rds")[["mix_rna"]]
+mix = ADImpute::NormalizeTPM(mix)
+source("src/environment_set.R")
+tfs_bulk = compute.TFs.activity(mix, universe = net) 
+tfs_bulk = t(tfs_bulk)
+tfs_bulk = abs(tfs_bulk)
+prop = omnideconv::deconvolute_cibersortx(bulk_gene_expression = as.matrix(tfs_bulk), 
+                                          signature = model, verbose = T)
+```
+
