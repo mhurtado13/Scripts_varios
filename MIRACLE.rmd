@@ -23,5 +23,3 @@ CellTFusion
 ```{r}
 res = CellTFusion(counts.norm, normalized = F, cbsx.mail = "marcelo.hurtado@inserm.fr", cbsx.token = "734212f6ad77fc4eea2bdb502792f294", file_name = "MIRACLE")
 ```
-
-
