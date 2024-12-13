@@ -25,7 +25,10 @@ rownames(counts.norm.immucan) = genes
 
 CellTFusion
 ```{r}
-res = CellTFusion(counts.nsclc2, normalized = F, cbsx.mail = "marcelo.hurtado@inserm.fr", cbsx.token = "734212f6ad77fc4eea2bdb502792f294", file_name = "IMMUCAN_NSCLC2")
-counts.nsclc2 = counts.norm.immucan[,grep("NSCLC2\\.", colnames(counts.norm.immucan))]
-deconv = compute.deconvolution(counts.nsclc, normalized = F, return = T, credentials.mail = "marcelo.hurtado@inserm.fr", credentials.token = "734212f6ad77fc4eea2bdb502792f294")
+#Drop sample
+i = "IMMU.SCCHN1.2110.FIXT.01.RNA.01_._counts_TPM_._11b8d48c5eeeb2b4922cdbb99283ff78"
+counts.norm.immucan = counts.norm.immucan[,-which(colnames(counts.norm.immucan)==i)]
+counts.scchn1 = counts.norm.immucan[,grep("SCCHN1\\.", colnames(counts.norm.immucan))]
+
+deconv = compute.deconvolution(counts.scchn1, normalized = F, return = T, methods = "CBSX", credentials.mail = "marcelo.hurtado@inserm.fr", credentials.token = "734212f6ad77fc4eea2bdb502792f294", doParallel = T, workers = 3)
 ```
