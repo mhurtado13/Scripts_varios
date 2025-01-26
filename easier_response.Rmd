@@ -1,0 +1,277 @@
+---
+title: "EASIER_response"
+output: html_document
+date: "2025-01-23"
+---
+
+```{r, eval=TRUE}
+BiocManager::install("easier", dependencies = TRUE)
+library("easier")
+```
+
+```{r, message=FALSE}
+suppressPackageStartupMessages({
+  library("easierData")
+  library("SummarizedExperiment")
+})
+```
+
+## Compute hallmarks of immune response
+```{r, eval=TRUE}
+hallmarks_of_immune_response <- c("CYT", "Roh_IS", "chemokines", "Davoli_IS", "IFNy", "Ayers_expIS", "Tcell_inflamed", "RIR", "TLS")
+immune_response_scores <- compute_scores_immune_response(RNA_tpm = counts.norm, 
+                                                         selected_scores = hallmarks_of_immune_response)
+head(immune_response_scores)
+```
+
+## Compute quantitative descriptors of the TME
+```{r, eval=TRUE}
+cell_fractions <- compute_cell_fractions(RNA_tpm = counts.norm)
+head(cell_fractions)
+```
+
+By applying PROGENy [@HOLLAND2020194431; @Schubert2018] method to count data from RNA-seq, the activity of 14 signaling pathways can be inferred as in the chunk below. 
+```{r, eval=TRUE}
+pathway_activities <- compute_pathway_activity(RNA_counts = counts.norm,
+                                               remove_sig_genes_immune_response = TRUE)
+head(pathway_activities)
+```
+
+By applying DoRothEA [@Garcia-Alonso01082019] method to TPM data from RNA-seq, the activity of 118 TFs can be inferred as follows:
+```{r, eval=TRUE}
+tf_activities <- compute_TF_activity(RNA_tpm = counts.norm)
+head(tf_activities[,1:5])
+```
+
+Using derived cancer-specific inter-cellular networks, the quantification of 867 ligand-receptor pairs can be done as in the chunk below. 
+```{r, eval=TRUE}
+lrpair_weights <- compute_LR_pairs(RNA_tpm = counts.norm,
+                                   cancer_type = "pancan")
+head(lrpair_weights[,1:5])
+```
+
+Using the ligand-receptor weights as input, 169 cell-cell interaction scores can be derived as in the chunk below. 
+```{r, eval=TRUE}
+ccpair_scores <- compute_CC_pairs(lrpairs = lrpair_weights, 
+                                  cancer_type = "pancan")
+head(ccpair_scores[,1:5])
+```
+
+Prediction
+```{r, eval=TRUE}
+opt_models = get_opt_models()
+predictions <- predict_immune_response(pathways = pathway_activities,
+                                       immunecells = cell_fractions,
+                                       tfs = tf_activities,
+                                       lrpairs = lrpair_weights,
+                                       ccpairs = ccpair_scores,
+                                       cancer_type = "LUAD", 
+                                       verbose = TRUE)
+```
+
+## Evaluate easier predictions using patients' immunotherapy response
+
+```{r, eval=TRUE}
+response = as.character(coldata[,"R.NR"])
+names(response) = rownames(coldata)
+output_eval_with_resp <- assess_immune_response(predictions_immune_response = predictions,
+                                                patient_response = response,
+                                                RNA_tpm = counts.norm)
+output_eval_with_resp
+```
+
+Heatmap to visualize predictions
+```{r}
+ann_colors <- HeatmapAnnotation(
+  Response = coldata$R.NR,
+  
+  col = list(
+    Response = c("R" = "green", "NR" = "red")
+  ),
+  
+  annotation_name_gp = gpar(fontsize = 20),
+  annotation_name_side = "right",
+  gap = unit(5, "mm"),
+
+  annotation_legend_param = list(labels_gp = gpar(fontsize = 20), legend_width = unit(15, "cm"),
+                                 legend_side = "left", 
+                                 title_gp = gpar(fontsize = 20))
+  
+)
+
+# train_data_df = train_data %>%
+#   dplyr::select(-target)
+
+ht1 = Heatmap(t(scale(predictions$pathways)), border = T, top_annotation = ann_colors, 
+              column_gap = unit(8, "mm"), name = "Deconvolution scores",
+              clustering_method_rows = "ward.D2", 
+              column_dend_height = unit(2, "cm"), row_dend_width = unit(2, "cm"), 
+              column_dend_reorder = T, row_dend_reorder = F,
+              show_row_names = T, 
+              show_heatmap_legend = T, 
+              row_names_gp = gpar(fontsize = 10), 
+              column_names_gp = gpar(fontsize =10), 
+              width = unit(40, "cm"), height = unit(40, "cm"),
+              heatmap_legend_param = list(labels_gp = gpar(fontsize = 12), legend_width = unit(12, "cm"), 
+                                          legend_heigh = unit(12, "cm"), title_gp = gpar(fontsize = 12)))
+
+pdf(paste0("Results/Train32_", file_name), height = 20, width = 25)
+draw(ht1, show_heatmap_legend = T, heatmap_legend_side = "left", annotation_legend_side = 'left')
+dev.off()
+```
+
+Cell groups
+```{r}
+library(h2o)
+
+lis_auc = c()
+
+for(i in 1:2){
+  set.seed(i) 
+  
+  clinical = coldata
+  trait = "R.NR"
+  trait.positive = "R"
+  partition = 0.75
+  
+  # Do stratified partition 
+  index = createDataPartition(clinical[,trait], times = 1, p = partition, list = FALSE) 
+  
+  # Train cohort
+  traitData_train = clinical[index, ]
+  counts.normalized_train = counts.norm[,index]
+  
+  # Test cohort
+  traitData_test = clinical[-index, ]
+  counts.normalized_test = counts.norm[,-index]
+  
+  #0.6714286 0.7857143 0.8285714 0.9285714 0.7428571 0.6571429 0.8428571 0.7928571 0.7071429 0.7571429
+  #features_tme <- compute_scores_immune_response(RNA_tpm = counts.normalized_train,                          
+  #                                                       selected_scores = hallmarks_of_immune_response)
+  
+  # features_tme <- compute_cell_fractions(RNA_tpm = counts.normalized_train)                  # 0.6857143 0.6285714
+  # 
+  # 
+  # features_tme <- compute_pathway_activity(RNA_counts = counts.normalized_train,              # 0.5857143 0.5857143
+  #                                                remove_sig_genes_immune_response = TRUE)
+  # 
+  #features_tme <- compute_TF_activity(RNA_tpm = counts.normalized_train) #0.7785714 0.8571429
+  # 
+  # lr <- compute_LR_pairs(RNA_tpm = counts.normalized_train, #0.7571429 0.7285714
+  #                                    cancer_type = "pancan")
+  # 
+  # features_tme <- compute_CC_pairs(lrpairs = lr,
+  #                                   cancer_type = "pancan") #0.5000000 0.4571429
+  
+  train_data = features_tme %>%
+  data.frame() %>%
+  mutate(Trait = traitData_train[,trait],
+        target = as.factor(ifelse(Trait == trait.positive, 'yes', 'no'))) %>%
+  dplyr::select(-Trait)
+  
+  train_data$target <- factor(train_data$target, levels = c("no", "yes"))  # Order, just in case to ensure positive class is not well defined
+  
+  features = setdiff(colnames(train_data), "target") 
+  
+  ####################### Testing set
+  
+  #testing_set <- compute_scores_immune_response(RNA_tpm = counts.normalized_test, 
+  #                                                       selected_scores = hallmarks_of_immune_response)
+  
+  # testing_set <- compute_cell_fractions(RNA_tpm = counts.normalized_test)
+  # 
+  # 
+  # testing_set <- compute_pathway_activity(RNA_counts = counts.normalized_test,
+  #                                                remove_sig_genes_immune_response = TRUE)
+  # 
+  #testing_set <- compute_TF_activity(RNA_tpm = counts.normalized_test)
+  # 
+  lr <- compute_LR_pairs(RNA_tpm = counts.normalized_test,
+                                     cancer_type = "pancan")
+
+  testing_set <- compute_CC_pairs(lrpairs = lr,
+                                    cancer_type = "pancan")
+  
+  target = traitData_test %>%
+  mutate(target = ifelse(traitData_test[,trait] == trait.positive, "yes", "no")) %>%
+  pull(target)
+  
+  target = factor(target, levels = c("no", "yes"))
+    
+  ########################################################### AutoML
+  
+  # Start the H2O cluster (locally)
+  h2o.init()
+  
+  # Import a sample binary outcome train/test set into H2O
+  train <- as.h2o(train_data)
+  
+  test <- testing_set %>%
+  mutate(target = target) %>%
+  as.h2o()
+  
+  # Identify predictors and response
+  y <- "target"
+  x <- setdiff(names(train), y)
+  
+  # For binary classification, response should be a factor
+  train[, y] <- as.factor(train[, y])
+  test[, y] <- as.factor(test[, y])
+  
+  # Run AutoML for 20 base models
+  aml <- h2o.automl(x = x, y = y,
+                  training_frame = train,
+                  max_models = 20, exclude_algos = "DeepLearning",
+                  seed = 123)
+  
+  best_model <- aml@leader
+  
+  # Generate predictions on the test set
+  pred <- h2o.predict(best_model, test)
+  
+  # AUC from h2o
+  perf <- h2o.performance(best_model, newdata = test)
+  auc <- h2o.auc(perf)
+  lis_auc = c(auc, lis_auc)
+}
+
+print(lis_auc)
+```
+
+```{r}
+ann_colors <- HeatmapAnnotation(
+  Response = train_data$target,
+  
+  col = list(
+    Response = c("yes" = "green", "no" = "red")
+  ),
+  
+  annotation_name_gp = gpar(fontsize = 20),
+  annotation_name_side = "right",
+  gap = unit(5, "mm"),
+
+  annotation_legend_param = list(labels_gp = gpar(fontsize = 20), legend_width = unit(15, "cm"),
+                                 legend_side = "left", 
+                                 title_gp = gpar(fontsize = 20))
+  
+)
+
+train_data_df = train_data %>%
+  dplyr::select(-target)
+ht1 = Heatmap(t(scale(train_data_df)), border = T, top_annotation = ann_colors, 
+              column_gap = unit(8, "mm"), name = "Deconvolution scores",
+              clustering_method_rows = "ward.D2", 
+              column_dend_height = unit(2, "cm"), row_dend_width = unit(2, "cm"), 
+              column_dend_reorder = T, row_dend_reorder = F,
+              show_row_names = T, 
+              show_heatmap_legend = T, 
+              row_names_gp = gpar(fontsize = 10), 
+              column_names_gp = gpar(fontsize =10), 
+              width = unit(40, "cm"), height = unit(40, "cm"),
+              heatmap_legend_param = list(labels_gp = gpar(fontsize = 12), legend_width = unit(12, "cm"), 
+                                          legend_heigh = unit(12, "cm"), title_gp = gpar(fontsize = 12)))
+
+pdf(paste0("Results/Train32_", file_name), height = 20, width = 25)
+draw(ht1, show_heatmap_legend = T, heatmap_legend_side = "left", annotation_legend_side = 'left')
+dev.off()
+```
