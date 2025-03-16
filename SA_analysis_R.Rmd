@@ -1,0 +1,83 @@
+---
+title: "Sensitivity_analysis"
+output: html_document
+author: "Marcelo Hurtado"
+date: "2025-03-16"
+---
+
+Load libraries
+```{r}
+library(sensobol)
+library(data.table)
+library(ggplot2)
+source("src/environment_set.R") #Load functions and packages from CellTFusion
+```
+
+Define parameter ranges
+```{r}
+# Number of samples per parameter
+N <- 1000  
+
+# Define the number of parameters
+k <- 3
+
+# Generate Sobol sample matrix
+X <- sobol_matrices(N = N, params = c("X1", "X2", "X3"), order = "third")
+
+# Fix parameter ranges
+param_info <- list(
+  X1 = c(-1, 1),    # Uniform [-1,1]
+  X2 = c(0, 2),     # Uniform [0,2]
+  X3 = c(-3,2)     # Uniform [-3,2]
+)
+
+# Rescale only the uniformly sampled parameters
+for (i in seq_along(param_info)) {
+  param_name <- names(param_info)[i]
+  
+  min_val <- param_info[[param_name]][1]
+  max_val <- param_info[[param_name]][2]
+    
+  # Apply min-max transformation
+  X[, i] <- min_val + X[, i] * (max_val - min_val)
+}
+
+head(X)  # Show first few rows
+```
+
+Define model function
+```{r}
+# Define the model function
+model_function <- function(X) {
+  x1 <- X[, 1]
+  x2 <- X[, 2]
+  x3 <- X[, 3]
+  return(x1^2 + x2 + sin(x3))
+}
+
+# Compute model outputs for Sobol samples
+y <- model_function(X)
+```
+
+Compute Sobol Sensitivity Indices
+```{r}
+# Compute Sobol indices using the Jansen estimator
+sobol_results <- sobol_indices(Y = y, N = N, params = colnames(X), type = "jansen")
+
+# Print sensitivity indices
+print(sobol_results)
+```
+
+Plot sensitivity indices
+```{r}
+# Plot first-order and total-order Sobol indices
+ggplot(sobol_results$results, aes(x = parameters, y = original, fill = sensitivity)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  theme_minimal() +
+  labs(title = "Sobol Sensitivity Analysis",
+       x = "Parameters",
+       y = "Sobol Index") +
+  scale_fill_manual(values = c("#0072B2", "#D55E00"))
+```
+
+
