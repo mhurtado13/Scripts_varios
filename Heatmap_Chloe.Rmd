@@ -7,6 +7,7 @@ date: "2025-03-15"
 Load data
 ```{r}
 anova_tests = read.csv("~/Downloads/test_marcelo.csv")
+library(dplyr)
 ```
 
 Preprocessing
@@ -14,45 +15,56 @@ Preprocessing
 column1 = c()
 column2 = c()
 for(i in 1:nrow(anova_tests)){
-  column1 = c(column1, stringr::str_split(anova_tests$Tukey.s.multiple.comparisons.test, "vs")[[i]][1])
-  column2 = c(column2, stringr::str_split(anova_tests$Tukey.s.multiple.comparisons.test, "vs")[[i]][2])
+  column1 = c(column1, gsub("^\\s+|\\s+$", "", stringr::str_split(anova_tests$Tukey.s.multiple.comparisons.test, "vs")[[i]][1]))
+  column2 = c(column2, gsub("^\\s+|\\s+$", "", gsub("\\.", "", stringr::str_split(anova_tests$Tukey.s.multiple.comparisons.test, "vs")[[i]][2])))
 }
 
 matrix_df <- anova_tests %>%
-  dplyr::mutate(x = column1, y = gsub("\\.", "", column2)) %>%
-  group_by(x, y) %>%               # Ensure unique (x, y) pairs
-  summarise(value = mean(Predicted..LS..mean.diff.), .groups = "drop") %>%  # Aggregate if needed
-  pivot_wider(names_from = y, values_from = value) %>%
-  column_to_rownames("x") 
+  dplyr::mutate(x = column1, y = column2) %>%
+  dplyr::group_by(x, y) %>%
+  dplyr::summarise(value = mean(Predicted..LS..mean.diff.), .groups = "drop") %>%
+  dplyr::bind_rows(rename(., x = y, y = x)) %>%
+  tidyr::pivot_wider(names_from = y, values_from = value) %>%
+  tibble::column_to_rownames("x") %>%
+  dplyr::select(all_of(rownames(.))) %>%
+  as.matrix()
 
 pval_df <- anova_tests %>%
   dplyr::mutate(x = column1, y = column2) %>%
-  group_by(x, y) %>%               # Ensure unique (x, y) pairs
-  summarise(value = paste(na.omit(unique(Summary)), collapse = ", "), .groups = "drop") %>%  # Aggregate if needed
-  pivot_wider(names_from = y, values_from = value) %>%
-  column_to_rownames("x") 
+  dplyr::group_by(x, y) %>%
+  dplyr::summarise(value = paste(na.omit(unique(Summary)), collapse = ", "), .groups = "drop") %>%
+  dplyr::bind_rows(rename(., x = y, y = x)) %>%
+  tidyr::pivot_wider(names_from = y, values_from = value) %>%
+  tibble::column_to_rownames("x") %>%
+  dplyr::select(all_of(rownames(.))) %>%
+  as.matrix()
+
 
 matrix_df = as.matrix(matrix_df)
 pval_df = as.matrix(pval_df)
 textMatrix = paste(signif(matrix_df, 2), "\n(", pval_df, ")", sep = "")
+#textMatrix = pval_df
 idx = which(is.na(pval_df) | pval_df == "ns")
+
 for (i in idx) {
   textMatrix[i] = NA
+  matrix_df[i] = NA
 }
 ```
 
 Heatmap
 ```{r}
-pdf("Heatmap_Chloe", width = 18, height = 15)
+pdf("Heatmap_Chloe.pdf", width = 18, height = 15)
 par(mar = c(25, 20, 3, 3))
-labeledHeatmap(Matrix = matrix_df,
+WGCNA::labeledHeatmap(Matrix = matrix_df,
                xLabels = colnames(matrix_df),
                yLabels = rownames(matrix_df),
                ySymbols = rownames(matrix_df),
                colorLabels = FALSE,
-               colors = blueWhiteRed(50),
+               colors = "red",
                textMatrix = textMatrix,
                setStdMargins = FALSE,
+               plotLegend = F,
                cex.text = 0.5,
                zlim = c(min(matrix_df, na.rm = T),max(matrix_df, na.rm = T)),
                main = paste("Anova results de Cloe"))
