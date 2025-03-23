@@ -42,32 +42,59 @@ pval_df <- anova_tests %>%
 
 matrix_df = as.matrix(matrix_df)
 pval_df = as.matrix(pval_df)
-textMatrix = paste(signif(matrix_df, 2), "\n(", pval_df, ")", sep = "")
+
+#textMatrix = pval_df
 #textMatrix = pval_df
 idx = which(is.na(pval_df) | pval_df == "ns")
 
 for (i in idx) {
-  textMatrix[i] = NA
+  pval_df[i] = NA
   matrix_df[i] = NA
 }
+
+textMatrix = pval_df
+
+```
+
+Change pvalues to numeric
+```{r}
+pval_df_numeric <- matrix(NA, nrow = nrow(pval_df), ncol = ncol(pval_df))
+rownames(pval_df_numeric) <- rownames(pval_df)
+colnames(pval_df_numeric) <- colnames(pval_df)
+
+for (i in seq_along(pval_df)) {
+  if (grepl("\\*\\*\\*\\*", pval_df[i])) {
+    pval_df_numeric[i] <- 4  # Assign 4 to '****'
+  } else if (grepl("\\*\\*\\*", pval_df[i])) {
+    pval_df_numeric[i] <- 3  # Assign 3 to '***'
+  } else if (grepl("\\*\\*", pval_df[i])) {
+    pval_df_numeric[i] <- 2  # Assign 2 to '**'
+  } else if (grepl("\\*", pval_df[i])) {
+    pval_df_numeric[i] <- 1  # Assign 1 to '*'
+  }else {
+    pval_df_numeric[i] <- NA  # Keep NA for non-significant values
+  }
+}
+
 ```
 
 Heatmap
 ```{r}
 pdf("Heatmap_Chloe.pdf", width = 18, height = 15)
 par(mar = c(25, 20, 3, 3))
-WGCNA::labeledHeatmap(Matrix = matrix_df,
-               xLabels = colnames(matrix_df),
-               yLabels = rownames(matrix_df),
-               ySymbols = rownames(matrix_df),
-               colorLabels = FALSE,
-               colors = "red",
-               textMatrix = textMatrix,
-               setStdMargins = FALSE,
-               plotLegend = F,
-               cex.text = 0.5,
-               zlim = c(min(matrix_df, na.rm = T),max(matrix_df, na.rm = T)),
-               main = paste("Anova results de Cloe"))
+WGCNA::labeledHeatmap(
+  Matrix = pval_df_numeric,
+  xLabels = colnames(matrix_df),
+  yLabels = rownames(matrix_df),
+  ySymbols = rownames(matrix_df),
+  colorLabels = FALSE,
+  colors = c("#EE6677", "#66CCEE", "#AA3377", "#4477AA"),
+  textMatrix = textMatrix,  # Keep original significance markers as text
+  setStdMargins = FALSE,
+  plotLegend = F,
+  cex.text = 1,
+  main = "Analyse two way anova cellules tumorales et macrophages en meme temps 2D"
+)
 dev.off()
 ```
 
