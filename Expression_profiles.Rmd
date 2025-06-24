@@ -1,0 +1,61 @@
+---
+title: "Expression_profiles"
+author: "Marcelo Hurtado"
+date: "2025-06-24"
+output: html_document
+---
+
+```{r}
+library(nnls)
+
+estimate_expression_profiles <- function(bulk_expr, cell_fracs) {
+  samples <- rownames(bulk_expr)
+  genes <- colnames(bulk_expr)
+  cell_types <- colnames(cell_fracs)
+  
+  # Initialize a list of matrices, one per cell type
+  expr_by_celltype <- lapply(cell_types, function(ct) {
+    matrix(0, nrow = length(samples), ncol = length(genes),
+           dimnames = list(samples, genes))
+  })
+  names(expr_by_celltype) <- cell_types
+  
+  # Iterate over each sample
+  for (s in seq_along(samples)) {
+    sample_name <- samples[s] # sample
+    p <- cell_fracs[s, ]  # deconvolution in sample
+    
+    # Iterate over each gene
+    for (g in seq_along(genes)) {
+      gene_name <- genes[g] # gene
+      y <- bulk_expr[s, g] # extract expression per gene and sample
+      X <- diag(p) # create a diagonal matrix with the proportions (to give the shape)
+      fit <- nnls(X, rep(y, length(p))) # compute non negative linear least squares (avoid negatives) to fit the model. Solve for X*beta = y
+      est_expr <- coef(fit) # extract the beta coefficient 
+      
+      # Store result per cell type
+      for (c in seq_along(cell_types)) {
+        expr_by_celltype[[c]][s, g] <- est_expr[c]
+      }
+    }
+  }
+  
+  return(expr_by_celltype)  # one matrix per cell type
+}
+```
+
+```{r}
+set.seed(42)
+bulk_expr <- matrix(runif(15), nrow = 3,
+                    dimnames = list(paste0("Sample", 1:3), paste0("Gene", 1:5)))
+cell_fracs <- matrix(runif(6), nrow = 3,
+                     dimnames = list(paste0("Sample", 1:3), c("Tcell", "Myeloid")))
+cell_fracs <- cell_fracs / rowSums(cell_fracs)
+
+expr_list <- estimate_expression_profiles(bulk_expr, cell_fracs)
+
+# Access example:
+Tcell_expr <- expr_list[["Tcell"]]  # A matrix: samples × genes
+head(Tcell_expr)
+```
+

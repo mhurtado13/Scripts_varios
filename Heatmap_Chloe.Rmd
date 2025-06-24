@@ -6,7 +6,8 @@ date: "2025-03-15"
 
 Load data
 ```{r}
-anova_tests = read.csv("~/Downloads/test_marcelo.csv")
+file_name = "Analyse 3D two way anova cellules tumorales"
+anova_tests = read.csv(paste0("~/Downloads/", file_name, ".csv"))
 library(dplyr)
 ```
 
@@ -80,7 +81,7 @@ for (i in seq_along(pval_df)) {
 
 Heatmap
 ```{r}
-pdf("Heatmap_Chloe.pdf", width = 18, height = 15)
+pdf(paste0(file_name, ".pdf"), width = 18, height = 15)
 par(mar = c(25, 20, 3, 3))
 WGCNA::labeledHeatmap(
   Matrix = pval_df_numeric,
@@ -93,7 +94,7 @@ WGCNA::labeledHeatmap(
   setStdMargins = FALSE,
   plotLegend = F,
   cex.text = 1,
-  main = "Analyse two way anova cellules tumorales et macrophages en meme temps 2D"
+  main = file_name
 )
 dev.off()
 ```
