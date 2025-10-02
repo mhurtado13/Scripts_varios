@@ -1,0 +1,104 @@
+---
+title: "Spatial_clinical"
+author: "Marcelo Hurtado"
+date: "2025-06-27"
+output: html_document
+---
+
+```{r}
+library(dplyr)
+library(ggplot2)
+source("src/CellTFusion.R")
+```
+
+Load data
+```{r}
+spatial_tumor = read.csv('~/Downloads/TUMOR_matrix .csv', row.names = 1)
+spatial_stroma = read.csv('~/Downloads/STROMA_matrix.csv', row.names = 1)
+spatial_tumor_assort = read.csv('~/Downloads/TUMOR_clean_transformed_matrix_for_clustering.csv', row.names = 1)
+spatial_stroma_assort = read.csv('~/Downloads/STROMA_clean_transformed_matrix_for_clustering.csv', row.names = 1)
+clinical = read.csv('~/Downloads/survival_info.csv', row.names = 1) %>%
+  dplyr::select(-Progression, -Survival, -PFS_Days)
+clinical = clinical[,-c(3,4,5)]
+```
+
+Spatial tumor
+```{r}
+spatial_tumor <- spatial_tumor %>%
+  dplyr::mutate(Sample_ID = stringr::str_extract(rownames(.), paste(rownames(clinical), collapse = "|"))) %>%
+  dplyr::filter(!is.na(Sample_ID)) %>%
+  dplyr::distinct(Sample_ID, .keep_all = TRUE)
+
+# Remove existing rownames 
+rownames(spatial_tumor) <- NULL
+
+# Set Sample_ID as rownames
+spatial_tumor <- spatial_tumor %>%
+  tibble::column_to_rownames("Sample_ID")
+
+coldata = clinical[rownames(clinical)%in%rownames(spatial_tumor),]
+
+# module correlation
+compute.metada.association(spatial_tumor, coldata, pval = 0.05, width = 8, height = 8)
+```
+
+
+Spatial stroma
+```{r}
+spatial_stroma <- spatial_stroma %>%
+  dplyr::mutate(Sample_ID = stringr::str_extract(rownames(.), paste(rownames(clinical), collapse = "|"))) %>%
+  dplyr::filter(!is.na(Sample_ID)) %>%
+  dplyr::distinct(Sample_ID, .keep_all = TRUE)
+
+# Remove existing rownames 
+rownames(spatial_stroma) <- NULL
+
+# Set Sample_ID as rownames
+spatial_stroma <- spatial_stroma %>%
+  tibble::column_to_rownames("Sample_ID")
+
+coldata = clinical[rownames(clinical)%in%rownames(spatial_stroma),]
+
+# module correlation
+compute.metada.association(spatial_stroma, coldata, pval = 0.05, width = 8, height = 8)
+```
+
+Spatial tumor assortativity
+```{r}
+spatial_tumor_assort <- spatial_tumor_assort %>%
+  dplyr::mutate(Sample_ID = stringr::str_extract(rownames(.), paste(rownames(clinical), collapse = "|"))) %>%
+  dplyr::filter(!is.na(Sample_ID)) %>%
+  dplyr::distinct(Sample_ID, .keep_all = TRUE)
+
+# Remove existing rownames 
+rownames(spatial_tumor_assort) <- NULL
+
+# Set Sample_ID as rownames
+spatial_tumor_assort <- spatial_tumor_assort %>%
+  tibble::column_to_rownames("Sample_ID")
+
+coldata = clinical[rownames(clinical)%in%rownames(spatial_tumor_assort),]
+
+# module correlation
+compute.metada.association(spatial_tumor_assort, coldata, pval = 0.05, width = 8, height = 12)
+```
+
+Spatial stroma assortativity
+```{r}
+spatial_stroma_assort <- spatial_stroma_assort %>%
+  dplyr::mutate(Sample_ID = stringr::str_extract(rownames(.), paste(rownames(clinical), collapse = "|"))) %>%
+  dplyr::filter(!is.na(Sample_ID)) %>%
+  dplyr::distinct(Sample_ID, .keep_all = TRUE)
+
+# Remove existing rownames 
+rownames(spatial_stroma_assort) <- NULL
+
+# Set Sample_ID as rownames
+spatial_stroma_assort <- spatial_stroma_assort %>%
+  tibble::column_to_rownames("Sample_ID")
+
+coldata = clinical[rownames(clinical)%in%rownames(spatial_stroma_assort),]
+
+# module correlation
+compute.metada.association(spatial_stroma_assort, coldata, pval = 0.05, width = 8, height = 10)
+```
