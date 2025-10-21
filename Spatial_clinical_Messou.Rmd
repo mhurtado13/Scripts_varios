@@ -8,7 +8,7 @@ output: html_document
 ```{r}
 library(dplyr)
 library(ggplot2)
-source("src/CellTFusion.R")
+library(CellTFusion)
 ```
 
 Load data
@@ -39,7 +39,7 @@ spatial_tumor <- spatial_tumor %>%
 coldata = clinical[rownames(clinical)%in%rownames(spatial_tumor),]
 
 # module correlation
-compute.metada.association(spatial_tumor, coldata, pval = 0.05, width = 8, height = 8)
+compute.metada.association(spatial_tumor, coldata, pval = 0.05, file.name = "Tumor", width = 8, height = 8)
 ```
 
 
@@ -60,7 +60,7 @@ spatial_stroma <- spatial_stroma %>%
 coldata = clinical[rownames(clinical)%in%rownames(spatial_stroma),]
 
 # module correlation
-compute.metada.association(spatial_stroma, coldata, pval = 0.05, width = 8, height = 8)
+compute.metada.association(spatial_stroma, coldata, pval = 0.05, file.name = "Stroma", width = 8, height = 8)
 ```
 
 Spatial tumor assortativity
@@ -80,7 +80,7 @@ spatial_tumor_assort <- spatial_tumor_assort %>%
 coldata = clinical[rownames(clinical)%in%rownames(spatial_tumor_assort),]
 
 # module correlation
-compute.metada.association(spatial_tumor_assort, coldata, pval = 0.05, width = 8, height = 12)
+compute.metada.association(spatial_tumor_assort, coldata, pval = 0.05, file.name = "Tumor_assortativity", width = 8, height = 12)
 ```
 
 Spatial stroma assortativity
@@ -100,5 +100,5 @@ spatial_stroma_assort <- spatial_stroma_assort %>%
 coldata = clinical[rownames(clinical)%in%rownames(spatial_stroma_assort),]
 
 # module correlation
-compute.metada.association(spatial_stroma_assort, coldata, pval = 0.05, width = 8, height = 10)
+compute.metada.association(spatial_stroma_assort, coldata, pval = 0.05, file.name = "Stroma_assortativity", width = 10, height = 12)
 ```
