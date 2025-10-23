@@ -1,0 +1,158 @@
+---
+title: "Analysis_HR"
+author: "Marcelo Hurtado"
+date: "2025-10-23"
+output: html_document
+---
+
+Load libraries
+```{r}
+library(CellTFusion)
+library(tibble)
+library(dplyr)
+library(readxl)
+library(ggplot2)
+set.seed(123)
+```
+
+Load data
+```{r}
+raw.counts = read.csv("~/Documents/Scripts_varios/hafida/raw_counts.csv", row.names = 1)
+traitdata = read.csv('~/Documents/Scripts_varios/hafida/clean_GSE62564_clinical_data.csv')
+```
+
+Preprocessing clinical data and filtering on HR
+```{r}
+traitdata <- traitdata %>%
+  dplyr::select(-sample.ID, -tissue, -training.validation) %>%         
+  dplyr::mutate(
+        Sample.title = stringr::str_remove(Sample.title, "\\[2\\]"),       
+        Sample.title = stringr::str_trim(Sample.title),                     
+        Sample.title = stringr::str_remove(Sample.title, "^SEQC_")           
+      ) %>%
+  dplyr::select(Sample.title, os.day, os.bin, high.risk, age) %>%      
+  dplyr::filter(high.risk == "HR") %>%                                
+  dplyr::select(-high.risk) %>%                                       
+  tibble::column_to_rownames("Sample.title") 
+
+raw.counts = raw.counts[,colnames(raw.counts)%in%rownames(traitdata)]
+```
+
+Deconvolution
+```{r}
+# deconv = multideconv::compute.deconvolution(raw.counts = raw.counts, normalized = T, credentials.mail = credentials.mail, 
+#                                             credentials.token = credentials.token, return = TRUE, 
+#                                             file_name = "GSE62564_deconvolution", doParallel = T, workers = 12)
+
+deconv = read.csv('~/Documents/Scripts_varios/hafida/Deconvolution_GSE62564_deconvolution3.csv', row.names = 1)
+colnames(deconv) <- gsub("Neutrophilsroendocrine", "Neuroendocrine", colnames(deconv))
+colnames(deconv) <- gsub("Neutrophilsroblasts", "Neuroblasts", colnames(deconv))
+colnames(deconv) = stringr::str_replace(colnames(deconv), "CD4", "CD4.cells")
+colnames(deconv) = stringr::str_replace(colnames(deconv), "Fibroblast.cells", "Fibroblasts")
+colnames(deconv) = stringr::str_replace(colnames(deconv), "Chromaffin", "Chromaffin.cells")
+
+# deconv = deconv %>%
+#   dplyr::select(-c("DeconRNASeq_Jansky_signatures_reduced_cycling.SCPs.1", 
+#                    "CBSX_Jansky_signatures_reduced_cycling.SCPs.1",
+#                    "CBSX_Jansky_signatures_reduced_connecting.Chromaffin.cells.cells.1"))
+
+colnames(deconv) <- gsub("\\.cells\\.cells$", ".cells", colnames(deconv))
+colnames(deconv) <- stringr::str_replace(colnames(deconv), "CD4\\.cells\\.(naive|memory)", "CD4.\\1")
+
+# Filtering on HR patients 
+deconv <- deconv[rownames(deconv) %in% rownames(traitdata), ] 
+```
+
+Normalize counts
+```{r}
+counts.norm = data.frame(ADImpute::NormalizeTPM(raw.counts, log = T)) 
+```
+
+TF activity
+```{r}
+tfs = compute.TFs.activity(counts.norm, TF.collection = "CollecTRI")
+```
+
+TF modules
+```{r}
+network = compute.WTCNA(tfs, corr_mod = 0.80, clustering.method = "ward.D2", return = T, verbose = T, softPower = 4) 
+compute.metadata.association(network[[1]], traitdata, pval = 0.05, file.name = "TF_modules", width = 10) 
+```
+
+Pathway activities
+```{r}
+pathways = compute.pathway.activity(counts.norm)
+compute.modules.relationship(network[[1]], pathways, "Pathways_Progeny-TFs_Modules", width = 15)
+```
+
+TF module enrichment 
+```{r}
+hub_tfs = identify_hub_TFs(t(tfs), network, MM_thresh = 0.8, degree_thresh = 0.9)
+compute.modules.enrichment(counts.norm, hub_tfs)
+```
+
+Deconvolution analysis
+```{r}
+dt = multideconv::compute.deconvolution.analysis(deconvolution = deconv,
+                                                  corr = 0.7,
+                                                  seed = 123,
+                                                  cells_extra = c("Neuroendocrine.cells",
+                                                                   "pDC.cells","Schwann.cells", "Bridge", "Neuroblasts",
+                                                                  "cycling.Neuroblasts", "cycling.SCPs", "connecting.Chromaffin.cells",
+                                                                  "SCPs", "Chromaffin.cells"),
+                                                  file_name = "GSE62564_subgroups3_HR_ST4",
+                                                  return = TRUE)
+
+compute.modules.relationship(network[[1]], dt[[1]], "Deconvolution-TFs_Modules", vertical = T, height = 30, width = 10, pval = 0.05)
+```
+
+Cell groups
+```{r}
+cell_groups = construct_cell_groups(counts.norm, tfs, deconv, network, dt, pval = 0.05)
+
+cell_groups_df <- data.frame(
+  cell_types = sapply(cell_groups[[2]], function(x) paste(x, collapse = ","))
+)
+```
+
+Save data for HR patients
+```{r}
+save(dt, network, tfs, pathways, cell_groups, file = "HR_analysis.RData")
+```
+
+########################################### TARGET cohort
+
+Clinical data
+```{r}
+clinical_target <- read.csv("~/Documents/Scripts_varios/hafida/TARGET.csv")
+clinical_target <- clinical_target[42:70, ]
+clinical_target$X.H.symbol <- NULL
+clinical_target <- t(clinical_target)
+clinical_target <- as.data.frame(clinical_target)
+colnames(clinical_target) <- clinical_target[1, ]
+clinical_target <- clinical_target[-1, ]
+clinical_target <- clinical_target[1:249, ]
+clinical_target <- clinical_target[clinical_target$cog_risk_group != "unknown", ]
+clinical_target$cog_risk_group <- ifelse(
+  clinical_target$cog_risk_group == "high_risk", "HR",
+  ifelse(clinical_target$cog_risk_group == "low_risk", "Non HR", clinical_target$cog_risk_group)
+)
+clinical_target_HR <- subset(clinical_target, cog_risk_group == "HR")
+```
+
+Deconvolution 
+```{r}
+deconv_2 <- read.csv("~/Documents/Scripts_varios/hafida/Deconvolution_TARGET_deconvolution.csv", row.names = 1)
+colnames(deconv_2) <- gsub("Neutrophilsroendocrine", "Neuroendocrine", colnames(deconv_2))
+colnames(deconv_2) <- gsub("Neutrophilsroblasts", "Neuroblasts", colnames(deconv_2))
+colnames(deconv_2) = stringr::str_replace(colnames(deconv_2), "CD4", "CD4.cells")
+colnames(deconv_2) = stringr::str_replace(colnames(deconv_2), "Fibroblast.cells", "Fibroblasts")
+colnames(deconv_2) = stringr::str_replace(colnames(deconv_2), "Chromaffin", "Chromaffin.cells")
+deconv_2 <- deconv_2[, !(colnames(deconv_2) %in% cols_to_remove)]
+colnames(deconv_2) <- gsub("\\.cells\\.cells$", ".cells", colnames(deconv_2))
+colnames(deconv_2) <- stringr::str_replace(colnames(deconv_2), "CD4\\.cells\\.(naive|memory)", "CD4.\\1")
+
+deconv_2_HR <- deconv_2[rownames(deconv_2) %in% rownames(clinical_target_HR), ]
+```
+
+

@@ -1,0 +1,499 @@
+,sample ID,Sample title,training/validation,Sex,age,efs day,efs bin,os day,os bin,high risk,a_efs_all,b_os_all,c_sex_all,d_fav_all,e_efs_hr,f_os_hr,tissue
+0,GSM1528894,SEQC_NB001 [2],Training,M,987.0,593,1,1362,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+1,GSM1528895,SEQC_NB002 [2],Validation,M,1808.0,2016,1,2836,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+2,GSM1528896,SEQC_NB003 [2],Training,F,625.0,840,1,1191,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+3,GSM1528897,SEQC_NB004 [2],Validation,F,335.0,2046,0,2046,0,HR,0,0,1.0,,0.0,0.0,neuroblastoma
+4,GSM1528898,SEQC_NB005 [2],Training,F,536.0,212,1,220,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+5,GSM1528899,SEQC_NB006 [2],Validation,M,147.0,2217,0,2217,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+6,GSM1528900,SEQC_NB007 [2],Training,M,942.0,562,1,3152,0,HR,1,0,0.0,,1.0,0.0,neuroblastoma
+7,GSM1528901,SEQC_NB008 [2],Validation,M,1652.0,3526,0,3526,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+8,GSM1528902,SEQC_NB009 [2],Training,F,217.0,2306,0,2306,0,HR,0,0,1.0,,0.0,0.0,neuroblastoma
+9,GSM1528903,SEQC_NB010 [2],Validation,M,379.0,620,1,1081,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+10,GSM1528904,SEQC_NB011 [2],Training,M,414.0,2094,0,2094,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+11,GSM1528905,SEQC_NB012 [2],Validation,M,380.0,1799,0,1799,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+12,GSM1528906,SEQC_NB013 [2],Training,M,3394.0,357,1,479,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+13,GSM1528907,SEQC_NB014 [2],Validation,F,515.0,3064,0,3064,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+14,GSM1528908,SEQC_NB015 [2],Training,M,4785.0,414,1,1327,0,HR,1,0,0.0,,1.0,0.0,neuroblastoma
+15,GSM1528909,SEQC_NB016 [2],Validation,F,0.0,2717,0,2717,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+16,GSM1528910,SEQC_NB017 [2],Training,M,765.0,2863,0,2863,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+17,GSM1528911,SEQC_NB018 [2],Validation,M,507.0,3508,0,3508,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+18,GSM1528912,SEQC_NB019 [2],Training,F,303.0,2499,0,2499,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+19,GSM1528913,SEQC_NB020 [2],Validation,M,497.0,3468,0,3468,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+20,GSM1528914,SEQC_NB021 [2],Training,F,564.0,3149,0,3149,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+21,GSM1528915,SEQC_NB022 [2],Validation,M,401.0,5263,0,5263,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+22,GSM1528916,SEQC_NB023 [2],Training,M,420.0,4492,0,4492,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+23,GSM1528917,SEQC_NB024 [2],Validation,F,499.0,4051,0,4051,0,Non HR,0,0,1.0,,,,neuroblastoma
+24,GSM1528918,SEQC_NB025 [2],Training,M,496.0,2101,0,2101,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+25,GSM1528919,SEQC_NB026 [2],Validation,F,488.0,707,0,707,0,Non HR,0,0,1.0,,,,neuroblastoma
+26,GSM1528920,SEQC_NB027 [2],Training,F,440.0,3753,0,3753,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+27,GSM1528921,SEQC_NB028 [2],Validation,F,468.0,3268,0,3268,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+28,GSM1528922,SEQC_NB029 [2],Training,M,463.0,1372,0,1372,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+29,GSM1528923,SEQC_NB030 [2],Validation,M,450.0,4353,0,4353,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+30,GSM1528924,SEQC_NB031 [2],Training,F,494.0,4823,0,4823,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+31,GSM1528925,SEQC_NB032 [2],Validation,F,398.0,3675,0,3675,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+32,GSM1528926,SEQC_NB033 [2],Training,F,479.0,4877,0,4877,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+33,GSM1528927,SEQC_NB034 [2],Validation,F,467.0,4240,0,4240,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+34,GSM1528928,SEQC_NB035 [2],Training,M,173.0,3807,0,3807,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+35,GSM1528929,SEQC_NB036 [2],Validation,M,744.0,4972,0,4972,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+36,GSM1528930,SEQC_NB037 [2],Training,F,446.0,4662,0,4662,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+37,GSM1528931,SEQC_NB038 [2],Validation,F,466.0,4521,0,4521,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+38,GSM1528932,SEQC_NB039 [2],Training,F,705.0,3750,0,3750,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+39,GSM1528933,SEQC_NB040 [2],Validation,M,971.0,3753,0,3753,0,Non HR,0,0,0.0,,,,neuroblastoma
+40,GSM1528934,SEQC_NB041 [2],Training,F,472.0,3312,0,3312,0,Non HR,0,0,1.0,,,,neuroblastoma
+41,GSM1528935,SEQC_NB042 [2],Validation,F,975.0,4365,0,4365,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+42,GSM1528936,SEQC_NB043 [2],Training,M,458.0,1589,0,1589,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+43,GSM1528937,SEQC_NB044 [2],Validation,F,528.0,2591,0,2591,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+44,GSM1528938,SEQC_NB045 [2],Training,F,867.0,3452,0,3452,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+45,GSM1528939,SEQC_NB046 [2],Validation,F,480.0,3984,0,3984,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+46,GSM1528940,SEQC_NB047 [2],Training,F,381.0,3428,0,3428,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+47,GSM1528941,SEQC_NB048 [2],Validation,M,715.0,1924,0,1924,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+48,GSM1528942,SEQC_NB049 [2],Training,F,638.0,3941,0,3941,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+49,GSM1528943,SEQC_NB050 [2],Validation,F,546.0,3456,0,3456,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+50,GSM1528944,SEQC_NB051 [2],Training,M,46.0,2753,0,2753,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+51,GSM1528945,SEQC_NB052 [2],Validation,F,1016.0,5435,0,5435,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+52,GSM1528946,SEQC_NB053 [2],Training,M,10.0,2055,0,2055,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+53,GSM1528947,SEQC_NB054 [2],Validation,F,824.0,2723,0,2723,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+54,GSM1528948,SEQC_NB055 [2],Training,F,94.0,2504,0,2504,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+55,GSM1528949,SEQC_NB056 [2],Validation,M,405.0,4556,0,4556,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+56,GSM1528950,SEQC_NB057 [2],Training,M,449.0,3352,0,3352,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+57,GSM1528951,SEQC_NB058 [2],Validation,F,743.0,3301,0,3301,0,Non HR,0,0,1.0,,,,neuroblastoma
+58,GSM1528952,SEQC_NB059 [2],Training,F,546.0,3990,0,3990,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+59,GSM1528953,SEQC_NB060 [2],Validation,M,470.0,4061,0,4061,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+60,GSM1528954,SEQC_NB061 [2],Training,M,442.0,3575,0,3575,0,Non HR,0,0,0.0,,,,neuroblastoma
+61,GSM1528955,SEQC_NB062 [2],Validation,F,408.0,4997,0,4997,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+62,GSM1528956,SEQC_NB063 [2],Training,F,472.0,485,1,3635,0,Non HR,1,0,1.0,,,,neuroblastoma
+63,GSM1528957,SEQC_NB064 [2],Validation,M,91.0,3675,0,3675,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+64,GSM1528958,SEQC_NB065 [2],Training,M,417.0,1211,0,1211,0,Non HR,0,0,0.0,,,,neuroblastoma
+65,GSM1528959,SEQC_NB066 [2],Validation,F,453.0,651,1,2773,0,Non HR,1,0,1.0,,,,neuroblastoma
+66,GSM1528960,SEQC_NB067 [2],Training,M,243.0,4494,0,4494,0,Non HR,0,0,0.0,,,,neuroblastoma
+67,GSM1528961,SEQC_NB068 [2],Validation,F,541.0,5131,0,5131,0,Non HR,0,0,1.0,,,,neuroblastoma
+68,GSM1528962,SEQC_NB069 [2],Training,F,1585.0,483,1,846,1,Non HR,1,1,1.0,1.0,,,neuroblastoma
+69,GSM1528963,SEQC_NB070 [2],Validation,F,379.0,3691,0,3691,0,Non HR,0,0,1.0,,,,neuroblastoma
+70,GSM1528964,SEQC_NB071 [2],Training,F,0.0,3832,0,3832,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+71,GSM1528965,SEQC_NB072 [2],Validation,M,202.0,6482,0,6482,0,Non HR,0,0,0.0,,,,neuroblastoma
+72,GSM1528966,SEQC_NB073 [2],Training,F,344.0,3566,0,3566,0,Non HR,0,0,1.0,,,,neuroblastoma
+73,GSM1528967,SEQC_NB074 [2],Validation,M,1126.0,1246,1,3555,0,Non HR,1,0,0.0,,,,neuroblastoma
+74,GSM1528968,SEQC_NB075 [2],Training,F,461.0,994,0,994,0,Non HR,0,0,1.0,,,,neuroblastoma
+75,GSM1528969,SEQC_NB076 [2],Validation,M,451.0,4440,0,4440,0,Non HR,0,0,0.0,,,,neuroblastoma
+76,GSM1528970,SEQC_NB077 [2],Training,M,66.0,4600,0,4600,0,Non HR,0,0,0.0,,,,neuroblastoma
+77,GSM1528971,SEQC_NB078 [2],Validation,M,1381.0,3111,0,3111,0,Non HR,0,0,0.0,,,,neuroblastoma
+78,GSM1528972,SEQC_NB079 [2],Training,M,452.0,5147,0,5147,0,Non HR,0,0,0.0,,,,neuroblastoma
+79,GSM1528973,SEQC_NB080 [2],Validation,F,1000.0,402,1,416,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+80,GSM1528974,SEQC_NB081 [2],Training,M,2737.0,2828,0,2828,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+81,GSM1528975,SEQC_NB082 [2],Validation,M,1012.0,3631,0,3631,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+82,GSM1528976,SEQC_NB083 [2],Training,M,1262.0,3208,0,3208,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+83,GSM1528977,SEQC_NB084 [2],Validation,F,495.0,5234,0,5234,0,Non HR,0,0,1.0,,,,neuroblastoma
+84,GSM1528978,SEQC_NB085 [2],Training,F,321.0,5133,0,5133,0,Non HR,0,0,1.0,,,,neuroblastoma
+85,GSM1528979,SEQC_NB086 [2],Validation,F,359.0,1752,1,3817,0,Non HR,1,0,1.0,,,,neuroblastoma
+86,GSM1528980,SEQC_NB087 [2],Training,M,1602.0,1890,1,2884,0,HR,1,0,0.0,,1.0,0.0,neuroblastoma
+87,GSM1528981,SEQC_NB088 [2],Validation,F,400.0,5318,0,5318,0,Non HR,0,0,1.0,,,,neuroblastoma
+88,GSM1528982,SEQC_NB089 [2],Training,M,395.0,3576,0,3576,0,Non HR,0,0,0.0,,,,neuroblastoma
+89,GSM1528983,SEQC_NB090 [2],Validation,F,5465.0,555,1,763,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+90,GSM1528984,SEQC_NB091 [2],Training,M,2429.0,1480,1,3804,0,HR,1,0,0.0,,1.0,0.0,neuroblastoma
+91,GSM1528985,SEQC_NB092 [2],Validation,M,933.0,497,1,1445,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+92,GSM1528986,SEQC_NB093 [2],Training,M,366.0,3935,0,3935,0,Non HR,0,0,0.0,,,,neuroblastoma
+93,GSM1528987,SEQC_NB094 [2],Validation,M,4394.0,486,1,1293,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+94,GSM1528988,SEQC_NB095 [2],Training,M,460.0,3883,0,3883,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+95,GSM1528989,SEQC_NB096 [2],Validation,F,465.0,3977,0,3977,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+96,GSM1528990,SEQC_NB097 [2],Training,F,529.0,3641,0,3641,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+97,GSM1528991,SEQC_NB098 [2],Validation,M,545.0,4042,0,4042,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+98,GSM1528992,SEQC_NB099 [2],Training,M,0.0,2167,0,2167,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+99,GSM1528993,SEQC_NB100 [2],Validation,M,218.0,3013,0,3013,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+100,GSM1528994,SEQC_NB101 [2],Training,M,425.0,2355,0,2355,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+101,GSM1528995,SEQC_NB102 [2],Validation,M,544.0,2432,0,2432,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+102,GSM1528996,SEQC_NB103 [2],Training,F,758.0,363,1,2694,0,Non HR,1,0,1.0,,,,neuroblastoma
+103,GSM1528997,SEQC_NB104 [2],Validation,M,272.0,2549,0,2549,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+104,GSM1528998,SEQC_NB105 [2],Training,F,887.0,3703,0,3703,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+105,GSM1528999,SEQC_NB106 [2],Validation,M,262.0,33,1,3898,0,Non HR,1,0,0.0,,,,neuroblastoma
+106,GSM1529000,SEQC_NB107 [2],Training,F,427.0,883,0,883,0,Non HR,0,0,1.0,,,,neuroblastoma
+107,GSM1529001,SEQC_NB108 [2],Validation,M,371.0,2808,0,2808,0,Non HR,0,0,0.0,,,,neuroblastoma
+108,GSM1529002,SEQC_NB109 [2],Training,M,101.0,168,1,2941,0,Non HR,1,0,0.0,,,,neuroblastoma
+109,GSM1529003,SEQC_NB110 [2],Validation,M,92.0,4480,0,4480,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+110,GSM1529004,SEQC_NB111 [2],Training,F,41.0,3957,0,3957,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+111,GSM1529005,SEQC_NB112 [2],Validation,F,734.0,2832,0,2832,0,Non HR,0,0,1.0,,,,neuroblastoma
+112,GSM1529006,SEQC_NB113 [2],Training,M,451.0,112,1,3283,0,HR,1,0,0.0,,1.0,0.0,neuroblastoma
+113,GSM1529007,SEQC_NB114 [2],Validation,M,465.0,2673,0,2673,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+114,GSM1529008,SEQC_NB115 [2],Training,M,417.0,3707,0,3707,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+115,GSM1529009,SEQC_NB116 [2],Validation,F,301.0,2458,0,2458,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+116,GSM1529010,SEQC_NB117 [2],Training,F,206.0,132,1,3217,0,Non HR,1,0,1.0,,,,neuroblastoma
+117,GSM1529011,SEQC_NB118 [2],Validation,M,256.0,1016,0,1016,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+118,GSM1529012,SEQC_NB119 [2],Training,F,207.0,674,1,1820,1,Non HR,1,1,1.0,1.0,,,neuroblastoma
+119,GSM1529013,SEQC_NB120 [2],Validation,M,228.0,3201,0,3201,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+120,GSM1529014,SEQC_NB121 [2],Training,M,121.0,2500,0,2500,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+121,GSM1529015,SEQC_NB122 [2],Validation,F,4562.0,759,1,1773,1,Non HR,1,1,1.0,1.0,,,neuroblastoma
+122,GSM1529016,SEQC_NB123 [2],Training,M,151.0,3324,0,3324,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+123,GSM1529017,SEQC_NB124 [2],Validation,M,240.0,54,1,2965,0,Non HR,1,0,0.0,,,,neuroblastoma
+124,GSM1529018,SEQC_NB125 [2],Training,F,9.0,3221,0,3221,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+125,GSM1529019,SEQC_NB126 [2],Validation,F,0.0,2405,0,2405,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+126,GSM1529020,SEQC_NB127 [2],Training,F,144.0,5813,0,5813,0,Non HR,0,0,1.0,,,,neuroblastoma
+127,GSM1529021,SEQC_NB128 [2],Validation,M,222.0,2552,0,2552,0,Non HR,0,0,0.0,,,,neuroblastoma
+128,GSM1529022,SEQC_NB129 [2],Training,M,1701.0,2365,0,2365,0,Non HR,0,0,0.0,,,,neuroblastoma
+129,GSM1529023,SEQC_NB130 [2],Validation,M,47.0,1128,1,3561,0,Non HR,1,0,0.0,,,,neuroblastoma
+130,GSM1529024,SEQC_NB131 [2],Training,M,2.0,1001,0,1001,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+131,GSM1529025,SEQC_NB132 [2],Validation,M,1071.0,4522,0,4522,0,Non HR,0,0,0.0,,,,neuroblastoma
+132,GSM1529026,SEQC_NB133 [2],Training,F,521.0,206,1,3604,0,Non HR,1,0,1.0,,,,neuroblastoma
+133,GSM1529027,SEQC_NB134 [2],Validation,M,0.0,3869,0,3869,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+134,GSM1529028,SEQC_NB135 [2],Training,M,526.0,5117,0,5117,0,Non HR,0,0,0.0,,,,neuroblastoma
+135,GSM1529029,SEQC_NB136 [2],Validation,M,1679.0,522,1,1655,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+136,GSM1529030,SEQC_NB137 [2],Training,M,1017.0,250,1,364,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+137,GSM1529031,SEQC_NB138 [2],Validation,M,823.0,3488,0,3488,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+138,GSM1529032,SEQC_NB139 [2],Training,F,181.0,4195,0,4195,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+139,GSM1529033,SEQC_NB140 [2],Validation,F,8983.0,645,1,899,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+140,GSM1529034,SEQC_NB141 [2],Training,M,228.0,3660,0,3660,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+141,GSM1529035,SEQC_NB142 [2],Validation,F,426.0,3405,0,3405,0,Non HR,0,0,1.0,,,,neuroblastoma
+142,GSM1529036,SEQC_NB143 [2],Training,F,1085.0,4096,0,4096,0,HR,0,0,1.0,,0.0,0.0,neuroblastoma
+143,GSM1529037,SEQC_NB144 [2],Validation,M,1141.0,2484,0,2484,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+144,GSM1529038,SEQC_NB145 [2],Training,M,356.0,2835,0,2835,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+145,GSM1529039,SEQC_NB146 [2],Validation,M,108.0,2680,0,2680,0,Non HR,0,0,0.0,,,,neuroblastoma
+146,GSM1529040,SEQC_NB147 [2],Training,M,134.0,2029,0,2029,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+147,GSM1529041,SEQC_NB148 [2],Validation,M,13.0,2375,0,2375,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+148,GSM1529042,SEQC_NB149 [2],Training,F,666.0,56,1,522,1,Non HR,1,1,1.0,1.0,,,neuroblastoma
+149,GSM1529043,SEQC_NB150 [2],Validation,F,181.0,3250,0,3250,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+150,GSM1529044,SEQC_NB151 [2],Training,F,1099.0,1758,0,1758,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+151,GSM1529045,SEQC_NB152 [2],Validation,M,37.0,4378,0,4378,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+152,GSM1529046,SEQC_NB153 [2],Training,F,2041.0,2651,0,2651,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+153,GSM1529047,SEQC_NB154 [2],Validation,M,82.0,3584,0,3584,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+154,GSM1529048,SEQC_NB155 [2],Training,M,63.0,3578,0,3578,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+155,GSM1529049,SEQC_NB156 [2],Validation,M,49.0,2774,0,2774,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+156,GSM1529050,SEQC_NB157 [2],Training,M,460.0,1440,0,1440,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+157,GSM1529051,SEQC_NB158 [2],Validation,F,23.0,1926,0,1926,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+158,GSM1529052,SEQC_NB159 [2],Training,F,933.0,2534,0,2534,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+159,GSM1529053,SEQC_NB160 [2],Validation,M,356.0,1211,0,1211,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+160,GSM1529054,SEQC_NB161 [2],Training,F,56.0,1463,0,1463,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+161,GSM1529055,SEQC_NB162 [2],Validation,F,700.0,2337,0,2337,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+162,GSM1529056,SEQC_NB163 [2],Training,M,20.0,2283,0,2283,0,Non HR,0,0,0.0,,,,neuroblastoma
+163,GSM1529057,SEQC_NB164 [2],Validation,M,267.0,2175,0,2175,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+164,GSM1529058,SEQC_NB165 [2],Training,F,262.0,1818,0,1818,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+165,GSM1529059,SEQC_NB166 [2],Validation,M,103.0,2114,0,2114,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+166,GSM1529060,SEQC_NB167 [2],Training,M,315.0,1663,0,1663,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+167,GSM1529061,SEQC_NB168 [2],Validation,F,90.0,1483,0,1483,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+168,GSM1529062,SEQC_NB169 [2],Training,M,4131.0,524,1,592,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+169,GSM1529063,SEQC_NB170 [2],Validation,M,6.0,192,1,3436,0,Non HR,1,0,0.0,,,,neuroblastoma
+170,GSM1529064,SEQC_NB171 [2],Training,M,7.0,2310,0,2310,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+171,GSM1529065,SEQC_NB172 [2],Validation,M,502.0,1406,0,1406,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+172,GSM1529066,SEQC_NB173 [2],Training,F,374.0,134,1,3385,0,Non HR,1,0,1.0,,,,neuroblastoma
+173,GSM1529067,SEQC_NB174 [2],Validation,M,429.0,3411,0,3411,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+174,GSM1529068,SEQC_NB175 [2],Training,F,134.0,1595,0,1595,0,HR,0,0,1.0,,0.0,0.0,neuroblastoma
+175,GSM1529069,SEQC_NB176 [2],Validation,M,363.0,1514,0,1514,0,Non HR,0,0,0.0,,,,neuroblastoma
+176,GSM1529070,SEQC_NB177 [2],Training,F,0.0,70,1,2359,0,Non HR,1,0,1.0,,,,neuroblastoma
+177,GSM1529071,SEQC_NB178 [2],Validation,M,0.0,2099,0,2099,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+178,GSM1529072,SEQC_NB179 [2],Training,M,42.0,83,1,1930,0,Non HR,1,0,0.0,,,,neuroblastoma
+179,GSM1529073,SEQC_NB180 [2],Validation,F,890.0,2092,0,2092,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+180,GSM1529074,SEQC_NB181 [2],Training,M,3.0,390,1,1674,0,Non HR,1,0,0.0,,,,neuroblastoma
+181,GSM1529075,SEQC_NB182 [2],Validation,M,217.0,1726,0,1726,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+182,GSM1529076,SEQC_NB183 [2],Training,M,1676.0,1995,0,1995,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+183,GSM1529077,SEQC_NB184 [2],Validation,M,370.0,1597,0,1597,0,Non HR,0,0,0.0,,,,neuroblastoma
+184,GSM1529078,SEQC_NB185 [2],Training,F,300.0,2140,0,2140,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+185,GSM1529079,SEQC_NB186 [2],Validation,F,121.0,74,1,1445,0,Non HR,1,0,1.0,,,,neuroblastoma
+186,GSM1529080,SEQC_NB187 [2],Training,M,1683.0,2462,0,2462,0,Non HR,0,0,0.0,,,,neuroblastoma
+187,GSM1529081,SEQC_NB188 [2],Validation,F,1057.0,349,1,1123,1,Non HR,1,1,1.0,1.0,,,neuroblastoma
+188,GSM1529082,SEQC_NB189 [2],Training,M,448.0,295,1,1514,0,Non HR,1,0,0.0,,,,neuroblastoma
+189,GSM1529083,SEQC_NB190 [2],Validation,M,1408.0,540,1,1120,1,Non HR,1,1,0.0,1.0,,,neuroblastoma
+190,GSM1529084,SEQC_NB191 [2],Training,F,227.0,321,1,2133,0,Non HR,1,0,1.0,,,,neuroblastoma
+191,GSM1529085,SEQC_NB192 [2],Validation,M,1004.0,866,1,1540,1,Non HR,1,1,0.0,1.0,,,neuroblastoma
+192,GSM1529086,SEQC_NB193 [2],Training,F,385.0,2276,0,2276,0,Non HR,0,0,1.0,,,,neuroblastoma
+193,GSM1529087,SEQC_NB194 [2],Validation,F,767.0,330,1,404,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+194,GSM1529088,SEQC_NB195 [2],Training,F,1081.0,347,1,360,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+195,GSM1529089,SEQC_NB196 [2],Validation,M,571.0,2797,0,2797,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+196,GSM1529090,SEQC_NB197 [2],Training,F,310.0,98,1,103,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+197,GSM1529091,SEQC_NB198 [2],Validation,F,423.0,417,1,526,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+198,GSM1529092,SEQC_NB199 [2],Training,M,186.0,1513,0,1513,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+199,GSM1529093,SEQC_NB200 [2],Validation,M,75.0,2140,0,2140,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+200,GSM1529094,SEQC_NB201 [2],Training,M,98.0,776,0,776,0,Non HR,0,0,0.0,,,,neuroblastoma
+201,GSM1529095,SEQC_NB202 [2],Validation,M,23.0,1441,0,1441,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+202,GSM1529096,SEQC_NB203 [2],Training,M,101.0,1953,0,1953,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+203,GSM1529097,SEQC_NB204 [2],Validation,F,18.0,1810,0,1810,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+204,GSM1529098,SEQC_NB205 [2],Training,M,165.0,1086,0,1086,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+205,GSM1529099,SEQC_NB206 [2],Validation,M,35.0,2812,0,2812,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+206,GSM1529100,SEQC_NB207 [2],Training,F,118.0,1546,0,1546,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+207,GSM1529101,SEQC_NB208 [2],Validation,F,29.0,1866,0,1866,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+208,GSM1529102,SEQC_NB209 [2],Training,F,226.0,2008,0,2008,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+209,GSM1529103,SEQC_NB210 [2],Validation,M,204.0,2263,0,2263,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+210,GSM1529104,SEQC_NB211 [2],Training,M,11.0,1294,0,1294,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+211,GSM1529105,SEQC_NB212 [2],Validation,M,0.0,68,1,1919,0,Non HR,1,0,0.0,,,,neuroblastoma
+212,GSM1529106,SEQC_NB213 [2],Training,M,560.0,1645,0,1645,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+213,GSM1529107,SEQC_NB214 [2],Validation,F,437.0,1493,0,1493,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+214,GSM1529108,SEQC_NB215 [2],Training,M,98.0,1994,0,1994,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+215,GSM1529109,SEQC_NB216 [2],Validation,M,262.0,2656,0,2656,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+216,GSM1529110,SEQC_NB217 [2],Training,M,129.0,1306,0,1306,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+217,GSM1529111,SEQC_NB218 [2],Validation,M,8.0,1757,0,1757,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+218,GSM1529112,SEQC_NB219 [2],Training,M,2.0,1518,0,1518,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+219,GSM1529113,SEQC_NB220 [2],Validation,F,0.0,1818,0,1818,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+220,GSM1529114,SEQC_NB221 [2],Training,M,1841.0,4373,0,4373,0,Non HR,0,0,0.0,,,,neuroblastoma
+221,GSM1529115,SEQC_NB222 [2],Validation,F,2225.0,928,1,1008,0,Non HR,1,0,1.0,,,,neuroblastoma
+222,GSM1529116,SEQC_NB223 [2],Training,F,28.0,188,1,1694,0,Non HR,1,0,1.0,,,,neuroblastoma
+223,GSM1529117,SEQC_NB224 [2],Validation,F,8926.0,1576,1,5860,0,Non HR,1,0,1.0,,,,neuroblastoma
+224,GSM1529118,SEQC_NB225 [2],Training,M,84.0,1683,0,1683,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+225,GSM1529119,SEQC_NB226 [2],Validation,M,680.0,1783,0,1783,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+226,GSM1529120,SEQC_NB227 [2],Training,M,87.0,155,1,2556,0,Non HR,1,0,0.0,,,,neuroblastoma
+227,GSM1529121,SEQC_NB228 [2],Validation,F,170.0,1553,0,1553,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+228,GSM1529122,SEQC_NB229 [2],Training,F,218.0,1690,0,1690,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+229,GSM1529123,SEQC_NB230 [2],Validation,M,9.0,390,0,390,0,Non HR,0,0,0.0,,,,neuroblastoma
+230,GSM1529124,SEQC_NB231 [2],Training,M,279.0,738,1,1624,0,Non HR,1,0,0.0,,,,neuroblastoma
+231,GSM1529125,SEQC_NB232 [2],Validation,F,49.0,59,1,1705,0,Non HR,1,0,1.0,,,,neuroblastoma
+232,GSM1529126,SEQC_NB233 [2],Training,M,152.0,75,1,1847,0,Non HR,1,0,0.0,,,,neuroblastoma
+233,GSM1529127,SEQC_NB234 [2],Validation,F,0.0,186,1,1323,0,Non HR,1,0,1.0,,,,neuroblastoma
+234,GSM1529128,SEQC_NB235 [2],Training,F,352.0,493,1,4922,0,Non HR,1,0,1.0,,,,neuroblastoma
+235,GSM1529129,SEQC_NB236 [2],Validation,M,1742.0,1260,0,1260,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+236,GSM1529130,SEQC_NB237 [2],Training,F,1798.0,2197,0,2197,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+237,GSM1529131,SEQC_NB238 [2],Validation,M,386.0,2807,0,2807,0,Non HR,0,0,0.0,,,,neuroblastoma
+238,GSM1529132,SEQC_NB239 [2],Training,M,1909.0,2100,0,2100,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+239,GSM1529133,SEQC_NB240 [2],Validation,F,215.0,1399,1,3568,0,Non HR,1,0,1.0,,,,neuroblastoma
+240,GSM1529134,SEQC_NB241 [2],Training,M,1101.0,1401,0,1401,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+241,GSM1529135,SEQC_NB242 [2],Validation,F,1841.0,532,1,626,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+242,GSM1529136,SEQC_NB243 [2],Training,M,1640.0,2790,0,2790,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+243,GSM1529137,SEQC_NB244 [2],Validation,M,724.0,475,1,601,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+244,GSM1529138,SEQC_NB245 [2],Training,M,1319.0,753,1,2808,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+245,GSM1529139,SEQC_NB246 [2],Validation,M,2324.0,1863,1,1925,0,HR,1,0,0.0,,1.0,0.0,neuroblastoma
+246,GSM1529140,SEQC_NB247 [2],Training,M,1267.0,886,1,1560,0,HR,1,0,0.0,,1.0,0.0,neuroblastoma
+247,GSM1529141,SEQC_NB248 [2],Validation,M,1273.0,1624,0,1624,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+248,GSM1529142,SEQC_NB249 [2],Training,M,1590.0,2208,0,2208,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+249,GSM1529143,SEQC_NB250 [2],Validation,F,1529.0,532,1,1118,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+250,GSM1529144,SEQC_NB251 [2],Training,M,1486.0,4508,0,4508,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+251,GSM1529145,SEQC_NB252 [2],Validation,F,658.0,780,1,843,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+252,GSM1529146,SEQC_NB253 [2],Training,F,247.0,1647,0,1647,0,Non HR,0,0,1.0,,,,neuroblastoma
+253,GSM1529147,SEQC_NB254 [2],Validation,M,219.0,2149,0,2149,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+254,GSM1529148,SEQC_NB255 [2],Training,F,982.0,518,1,602,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+255,GSM1529149,SEQC_NB256 [2],Validation,F,279.0,482,1,889,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+256,GSM1529150,SEQC_NB257 [2],Training,F,1964.0,441,1,478,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+257,GSM1529151,SEQC_NB258 [2],Validation,F,3749.0,2092,0,2092,0,HR,0,0,1.0,,0.0,0.0,neuroblastoma
+258,GSM1529152,SEQC_NB259 [2],Training,F,517.0,433,1,711,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+259,GSM1529153,SEQC_NB260 [2],Validation,F,710.0,1792,0,1792,0,HR,0,0,1.0,,0.0,0.0,neuroblastoma
+260,GSM1529154,SEQC_NB261 [2],Training,M,1029.0,3570,0,3570,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+261,GSM1529155,SEQC_NB262 [2],Validation,F,633.0,431,1,454,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+262,GSM1529156,SEQC_NB263 [2],Training,F,8278.0,214,1,360,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+263,GSM1529157,SEQC_NB264 [2],Validation,F,2105.0,443,1,784,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+264,GSM1529158,SEQC_NB265 [2],Training,M,769.0,2275,0,2275,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+265,GSM1529159,SEQC_NB266 [2],Validation,F,880.0,2086,0,2086,0,HR,0,0,1.0,,0.0,0.0,neuroblastoma
+266,GSM1529160,SEQC_NB267 [2],Training,F,978.0,1197,1,1695,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+267,GSM1529161,SEQC_NB268 [2],Validation,M,3842.0,363,1,499,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+268,GSM1529162,SEQC_NB269 [2],Training,F,583.0,946,1,1375,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+269,GSM1529163,SEQC_NB270 [2],Validation,M,121.0,326,1,391,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+270,GSM1529164,SEQC_NB271 [2],Training,M,589.0,305,1,375,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+271,GSM1529165,SEQC_NB272 [2],Validation,M,1174.0,468,1,1699,0,HR,1,0,0.0,,1.0,0.0,neuroblastoma
+272,GSM1529166,SEQC_NB273 [2],Training,M,165.0,318,1,2907,0,Non HR,1,0,0.0,,,,neuroblastoma
+273,GSM1529167,SEQC_NB274 [2],Validation,F,35.0,1047,0,1047,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+274,GSM1529168,SEQC_NB275 [2],Training,F,52.0,3571,0,3571,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+275,GSM1529169,SEQC_NB276 [2],Validation,M,12.0,3163,0,3163,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+276,GSM1529170,SEQC_NB277 [2],Training,F,194.0,4844,0,4844,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+277,GSM1529171,SEQC_NB278 [2],Validation,M,121.0,3328,0,3328,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+278,GSM1529172,SEQC_NB279 [2],Training,M,66.0,3245,0,3245,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+279,GSM1529173,SEQC_NB280 [2],Validation,F,193.0,3493,0,3493,0,Non HR,0,0,1.0,,,,neuroblastoma
+280,GSM1529174,SEQC_NB281 [2],Training,M,0.0,5060,0,5060,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+281,GSM1529175,SEQC_NB282 [2],Validation,M,202.0,286,1,2280,0,Non HR,1,0,0.0,,,,neuroblastoma
+282,GSM1529176,SEQC_NB283 [2],Training,M,118.0,3340,0,3340,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+283,GSM1529177,SEQC_NB284 [2],Validation,M,10.0,296,1,2785,0,Non HR,1,0,0.0,,,,neuroblastoma
+284,GSM1529178,SEQC_NB285 [2],Training,M,79.0,3901,0,3901,0,Non HR,0,0,0.0,,,,neuroblastoma
+285,GSM1529179,SEQC_NB286 [2],Validation,M,3.0,3451,0,3451,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+286,GSM1529180,SEQC_NB287 [2],Training,F,50.0,1262,1,2410,1,Non HR,1,1,1.0,1.0,,,neuroblastoma
+287,GSM1529181,SEQC_NB288 [2],Validation,F,93.0,2641,0,2641,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+288,GSM1529182,SEQC_NB289 [2],Training,F,144.0,399,1,419,1,Non HR,1,1,1.0,1.0,,,neuroblastoma
+289,GSM1529183,SEQC_NB290 [2],Validation,M,139.0,2631,0,2631,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+290,GSM1529184,SEQC_NB291 [2],Training,F,128.0,2588,0,2588,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+291,GSM1529185,SEQC_NB292 [2],Validation,M,75.0,1579,0,1579,0,Non HR,0,0,0.0,,,,neuroblastoma
+292,GSM1529186,SEQC_NB293 [2],Training,M,21.0,2425,0,2425,0,Non HR,0,0,0.0,,,,neuroblastoma
+293,GSM1529187,SEQC_NB294 [2],Validation,F,121.0,2249,0,2249,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+294,GSM1529188,SEQC_NB295 [2],Training,F,146.0,17,1,1647,0,Non HR,1,0,1.0,,,,neuroblastoma
+295,GSM1529189,SEQC_NB296 [2],Validation,M,69.0,2245,0,2245,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+296,GSM1529190,SEQC_NB297 [2],Training,M,305.0,301,1,2169,0,Non HR,1,0,0.0,,,,neuroblastoma
+297,GSM1529191,SEQC_NB298 [2],Validation,F,180.0,998,0,998,0,Non HR,0,0,1.0,,,,neuroblastoma
+298,GSM1529192,SEQC_NB299 [2],Training,M,263.0,2113,0,2113,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+299,GSM1529193,SEQC_NB300 [2],Validation,M,11.0,1567,1,3303,0,Non HR,1,0,0.0,,,,neuroblastoma
+300,GSM1529194,SEQC_NB301 [2],Training,M,313.0,1393,0,1393,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+301,GSM1529195,SEQC_NB302 [2],Validation,F,105.0,86,1,1689,0,Non HR,1,0,1.0,,,,neuroblastoma
+302,GSM1529196,SEQC_NB303 [2],Training,M,443.0,1323,0,1323,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+303,GSM1529197,SEQC_NB304 [2],Validation,M,3.0,2005,0,2005,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+304,GSM1529198,SEQC_NB305 [2],Training,F,12.0,66,1,66,1,Non HR,1,1,1.0,1.0,,,neuroblastoma
+305,GSM1529199,SEQC_NB306 [2],Validation,F,16.0,2482,0,2482,0,Non HR,0,0,1.0,,,,neuroblastoma
+306,GSM1529200,SEQC_NB307 [2],Training,F,121.0,1439,0,1439,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+307,GSM1529201,SEQC_NB308 [2],Validation,F,143.0,1998,0,1998,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+308,GSM1529202,SEQC_NB309 [2],Training,M,3.0,164,1,1907,0,Non HR,1,0,0.0,,,,neuroblastoma
+309,GSM1529203,SEQC_NB310 [2],Validation,M,116.0,2103,0,2103,0,Non HR,0,0,0.0,,,,neuroblastoma
+310,GSM1529204,SEQC_NB311 [2],Training,F,0.0,207,1,2798,0,Non HR,1,0,1.0,,,,neuroblastoma
+311,GSM1529205,SEQC_NB312 [2],Validation,M,97.0,2724,0,2724,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+312,GSM1529206,SEQC_NB313 [2],Training,M,92.0,2101,0,2101,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+313,GSM1529207,SEQC_NB314 [2],Validation,M,196.0,351,1,539,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+314,GSM1529208,SEQC_NB315 [2],Training,M,14.0,1870,0,1870,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+315,GSM1529209,SEQC_NB316 [2],Validation,M,85.0,161,1,209,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+316,GSM1529210,SEQC_NB317 [2],Training,F,732.0,1069,0,1069,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+317,GSM1529211,SEQC_NB318 [2],Validation,F,300.0,1140,0,1140,0,Non HR,0,0,,0.0,,,neuroblastoma
+318,GSM1529212,SEQC_NB319 [2],Training,M,357.0,286,1,412,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+319,GSM1529213,SEQC_NB320 [2],Validation,M,1113.0,375,1,735,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+320,GSM1529214,SEQC_NB321 [2],Training,M,870.0,181,1,846,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+321,GSM1529215,SEQC_NB322 [2],Validation,M,1611.0,323,1,487,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+322,GSM1529216,SEQC_NB323 [2],Training,M,450.0,302,1,510,1,Non HR,1,1,0.0,1.0,,,neuroblastoma
+323,GSM1529217,SEQC_NB324 [2],Validation,M,120.0,1740,0,1740,0,Non HR,0,0,,0.0,,,neuroblastoma
+324,GSM1529218,SEQC_NB325 [2],Training,M,360.0,1110,0,1110,0,Non HR,0,0,,0.0,,,neuroblastoma
+325,GSM1529219,SEQC_NB326 [2],Validation,F,3240.0,90,1,90,1,HR,1,1,,1.0,1.0,1.0,neuroblastoma
+326,GSM1529220,SEQC_NB327 [2],Training,M,690.0,570,1,720,1,HR,1,1,,1.0,1.0,1.0,neuroblastoma
+327,GSM1529221,SEQC_NB328 [2],Validation,F,1560.0,300,1,330,1,HR,1,1,,1.0,1.0,1.0,neuroblastoma
+328,GSM1529222,SEQC_NB329 [2],Training,M,387.0,4669,0,4669,0,Non HR,0,0,0.0,,,,neuroblastoma
+329,GSM1529223,SEQC_NB330 [2],Validation,M,516.0,2947,0,2947,0,Non HR,0,0,0.0,,,,neuroblastoma
+330,GSM1529224,SEQC_NB331 [2],Training,M,1676.0,576,1,1049,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+331,GSM1529225,SEQC_NB332 [2],Validation,M,549.0,2871,0,2871,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+332,GSM1529226,SEQC_NB333 [2],Training,M,1545.0,602,1,1229,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+333,GSM1529227,SEQC_NB334 [2],Validation,F,432.0,2135,0,2135,0,Non HR,0,0,1.0,,,,neuroblastoma
+334,GSM1529228,SEQC_NB335 [2],Training,F,1764.0,349,1,1341,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+335,GSM1529229,SEQC_NB336 [2],Validation,M,1067.0,837,1,2051,0,HR,1,0,0.0,,1.0,0.0,neuroblastoma
+336,GSM1529230,SEQC_NB337 [2],Training,M,1968.0,112,1,239,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+337,GSM1529231,SEQC_NB338 [2],Validation,F,1413.0,2432,0,2432,0,HR,0,0,1.0,,0.0,0.0,neuroblastoma
+338,GSM1529232,SEQC_NB339 [2],Training,F,714.6,269,1,269,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+339,GSM1529233,SEQC_NB340 [2],Validation,F,300.0,810,0,810,0,Non HR,0,0,,,,,neuroblastoma
+340,GSM1529234,SEQC_NB341 [2],Training,M,750.0,120,1,1440,0,HR,1,0,,,1.0,0.0,neuroblastoma
+341,GSM1529235,SEQC_NB342 [2],Validation,F,210.0,1410,0,1410,0,Non HR,0,0,,0.0,,,neuroblastoma
+342,GSM1529236,SEQC_NB343 [2],Training,F,300.0,150,0,150,0,Non HR,0,0,,,,,neuroblastoma
+343,GSM1529237,SEQC_NB344 [2],Validation,M,300.0,720,0,720,0,Non HR,0,0,,,,,neuroblastoma
+344,GSM1529238,SEQC_NB345 [2],Training,M,240.0,1470,0,1470,0,Non HR,0,0,,0.0,,,neuroblastoma
+345,GSM1529239,SEQC_NB346 [2],Validation,F,310.0,1590,0,1590,0,Non HR,0,0,,0.0,,,neuroblastoma
+346,GSM1529240,SEQC_NB347 [2],Training,F,60.0,1080,0,1080,0,Non HR,0,0,,0.0,,,neuroblastoma
+347,GSM1529241,SEQC_NB348 [2],Validation,M,47.0,1984,0,1984,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+348,GSM1529242,SEQC_NB349 [2],Training,F,270.0,5040,0,5040,0,Non HR,0,0,1.0,,,,neuroblastoma
+349,GSM1529243,SEQC_NB350 [2],Validation,F,271.0,4890,0,4890,0,Non HR,0,0,1.0,,,,neuroblastoma
+350,GSM1529244,SEQC_NB351 [2],Training,M,1290.0,6600,0,6600,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+351,GSM1529245,SEQC_NB352 [2],Validation,M,1050.0,2280,0,2280,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+352,GSM1529246,SEQC_NB353 [2],Training,M,1200.0,1170,1,2010,1,Non HR,1,1,0.0,1.0,,,neuroblastoma
+353,GSM1529247,SEQC_NB354 [2],Validation,F,267.0,354,1,441,1,Non HR,1,1,1.0,1.0,,,neuroblastoma
+354,GSM1529248,SEQC_NB355 [2],Training,M,0.0,2804,0,2804,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+355,GSM1529249,SEQC_NB356 [2],Validation,M,1074.0,4602,0,4602,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+356,GSM1529250,SEQC_NB357 [2],Training,F,364.0,74,1,3903,0,Non HR,1,0,1.0,,,,neuroblastoma
+357,GSM1529251,SEQC_NB358 [2],Validation,F,304.0,98,1,4410,0,Non HR,1,0,1.0,,,,neuroblastoma
+358,GSM1529252,SEQC_NB359 [2],Training,M,1570.0,708,1,1152,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+359,GSM1529253,SEQC_NB360 [2],Validation,M,2135.0,454,1,1063,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+360,GSM1529254,SEQC_NB361 [2],Training,M,416.0,418,1,1628,0,Non HR,1,0,0.0,,,,neuroblastoma
+361,GSM1529255,SEQC_NB362 [2],Validation,M,641.0,563,1,1073,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+362,GSM1529256,SEQC_NB363 [2],Training,M,49.0,1330,0,1330,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+363,GSM1529257,SEQC_NB364 [2],Validation,M,8.0,1890,0,1890,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+364,GSM1529258,SEQC_NB365 [2],Training,M,80.0,1567,0,1567,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+365,GSM1529259,SEQC_NB366 [2],Validation,M,0.0,3625,0,3625,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+366,GSM1529260,SEQC_NB367 [2],Training,F,56.0,3131,0,3131,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+367,GSM1529261,SEQC_NB368 [2],Validation,F,58.0,2852,0,2852,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+368,GSM1529262,SEQC_NB369 [2],Training,M,1132.0,634,1,727,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+369,GSM1529263,SEQC_NB370 [2],Validation,M,216.0,2015,0,2015,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+370,GSM1529264,SEQC_NB371 [2],Training,F,1488.0,262,1,541,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+371,GSM1529265,SEQC_NB372 [2],Validation,M,1890.0,164,1,2174,0,HR,1,0,0.0,,1.0,0.0,neuroblastoma
+372,GSM1529266,SEQC_NB373 [2],Training,F,489.0,187,1,209,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+373,GSM1529267,SEQC_NB374 [2],Validation,M,1024.0,147,1,3234,0,HR,1,0,0.0,,1.0,0.0,neuroblastoma
+374,GSM1529268,SEQC_NB375 [2],Training,M,924.0,218,1,364,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+375,GSM1529270,SEQC_NB376 [2],Validation,M,1071.0,227,1,498,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+376,GSM1529271,SEQC_NB377 [2],Training,M,1437.0,1455,1,2324,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+377,GSM1529272,SEQC_NB378 [2],Validation,F,3072.0,245,1,415,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+378,GSM1529274,SEQC_NB379 [2],Training,M,810.0,2054,0,2054,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+379,GSM1529275,SEQC_NB380 [2],Validation,F,21.0,2771,0,2771,0,Non HR,0,0,1.0,,,,neuroblastoma
+380,GSM1529276,SEQC_NB381 [2],Training,F,633.0,314,1,345,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+381,GSM1529277,SEQC_NB382 [2],Validation,F,660.0,5070,0,5070,0,Non HR,0,0,1.0,,,,neuroblastoma
+382,GSM1529278,SEQC_NB383 [2],Training,M,1904.0,201,1,207,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+383,GSM1529279,SEQC_NB384 [2],Validation,F,1424.0,705,1,3809,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+384,GSM1529280,SEQC_NB385 [2],Training,F,2544.0,812,1,1454,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+385,GSM1529281,SEQC_NB386 [2],Validation,F,2264.0,622,1,2132,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+386,GSM1529282,SEQC_NB387 [2],Training,M,431.0,3011,0,3011,0,Non HR,0,0,0.0,,,,neuroblastoma
+387,GSM1529283,SEQC_NB388 [2],Validation,M,1363.0,196,1,1014,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+388,GSM1529284,SEQC_NB389 [2],Training,M,660.0,4090,0,4090,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+389,GSM1529285,SEQC_NB390 [2],Validation,F,822.0,377,1,467,1,HR,1,1,1.0,,1.0,1.0,neuroblastoma
+390,GSM1529286,SEQC_NB391 [2],Training,M,1644.0,2818,0,2818,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+391,GSM1529287,SEQC_NB392 [2],Validation,M,1282.0,593,1,766,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+392,GSM1529288,SEQC_NB393 [2],Training,M,1537.0,615,1,1235,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+393,GSM1529289,SEQC_NB394 [2],Validation,M,1524.0,828,1,2269,0,HR,1,0,0.0,,1.0,0.0,neuroblastoma
+394,GSM1529290,SEQC_NB395 [2],Training,F,2111.0,2442,0,2442,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+395,GSM1529291,SEQC_NB396 [2],Validation,F,1221.0,970,1,1401,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+396,GSM1529292,SEQC_NB397 [2],Training,M,107.0,3571,0,3571,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+397,GSM1529293,SEQC_NB398 [2],Validation,M,227.0,293,1,2807,0,Non HR,1,0,0.0,,,,neuroblastoma
+398,GSM1529294,SEQC_NB399 [2],Training,M,1215.0,978,0,978,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+399,GSM1529295,SEQC_NB400 [2],Validation,M,1812.0,499,1,834,0,HR,1,0,0.0,,1.0,0.0,neuroblastoma
+400,GSM1529296,SEQC_NB401 [2],Training,M,1875.0,1002,1,1382,0,HR,1,0,0.0,,1.0,0.0,neuroblastoma
+401,GSM1529297,SEQC_NB402 [2],Validation,F,1325.0,833,1,1242,0,HR,1,0,1.0,,1.0,0.0,neuroblastoma
+402,GSM1529298,SEQC_NB403 [2],Training,M,447.0,55,1,203,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+403,GSM1529299,SEQC_NB404 [2],Validation,F,529.0,407,1,425,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+404,GSM1529300,SEQC_NB405 [2],Training,M,2338.0,608,0,608,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+405,GSM1529301,SEQC_NB406 [2],Validation,F,1053.0,336,1,380,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+406,GSM1529302,SEQC_NB407 [2],Training,M,1272.0,382,1,463,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+407,GSM1529303,SEQC_NB408 [2],Validation,M,907.0,454,1,555,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+408,GSM1529304,SEQC_NB409 [2],Training,M,827.0,588,0,588,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+409,GSM1529305,SEQC_NB410 [2],Validation,F,2621.0,259,0,259,0,HR,0,0,1.0,,0.0,0.0,neuroblastoma
+410,GSM1529306,SEQC_NB411 [2],Training,F,2186.0,834,1,1266,0,HR,1,0,1.0,,1.0,0.0,neuroblastoma
+411,GSM1529307,SEQC_NB412 [2],Validation,M,1553.0,874,1,2141,0,HR,1,0,0.0,,1.0,0.0,neuroblastoma
+412,GSM1529308,SEQC_NB413 [2],Training,F,1431.0,232,0,232,0,HR,0,0,1.0,,0.0,0.0,neuroblastoma
+413,GSM1529309,SEQC_NB414 [2],Validation,M,989.0,287,1,663,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+414,GSM1529310,SEQC_NB415 [2],Training,F,849.0,623,1,785,0,HR,1,0,1.0,,1.0,0.0,neuroblastoma
+415,GSM1529311,SEQC_NB416 [2],Validation,M,5225.0,337,1,966,0,Non HR,1,0,0.0,,,,neuroblastoma
+416,GSM1529312,SEQC_NB417 [2],Training,M,235.0,1176,0,1176,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+417,GSM1529313,SEQC_NB418 [2],Validation,M,1383.0,1035,0,1035,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+418,GSM1529314,SEQC_NB419 [2],Training,F,133.0,264,0,264,0,Non HR,0,0,1.0,,,,neuroblastoma
+419,GSM1529315,SEQC_NB420 [2],Validation,F,3488.0,1862,0,1862,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+420,GSM1529316,SEQC_NB421 [2],Training,M,87.0,1916,0,1916,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+421,GSM1529317,SEQC_NB422 [2],Validation,M,1708.0,668,1,1174,0,HR,1,0,0.0,,1.0,0.0,neuroblastoma
+422,GSM1529318,SEQC_NB423 [2],Training,M,207.0,1122,1,1423,0,Non HR,1,0,0.0,,,,neuroblastoma
+423,GSM1529319,SEQC_NB424 [2],Validation,F,533.0,1239,0,1239,0,HR,0,0,1.0,,0.0,0.0,neuroblastoma
+424,GSM1529320,SEQC_NB425 [2],Training,M,227.0,1813,0,1813,0,Non HR,0,0,0.0,,,,neuroblastoma
+425,GSM1529321,SEQC_NB426 [2],Validation,M,1010.0,2669,0,2669,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+426,GSM1529322,SEQC_NB427 [2],Training,M,214.0,1598,0,1598,0,Non HR,0,0,0.0,,,,neuroblastoma
+427,GSM1529323,SEQC_NB428 [2],Validation,M,441.0,1053,0,1053,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+428,GSM1529324,SEQC_NB429 [2],Training,F,236.0,2977,0,2977,0,Non HR,0,0,1.0,,,,neuroblastoma
+429,GSM1529325,SEQC_NB430 [2],Validation,M,837.0,566,1,1379,0,HR,1,0,0.0,,1.0,0.0,neuroblastoma
+430,GSM1529326,SEQC_NB431 [2],Training,F,448.0,280,0,280,0,HR,0,0,1.0,,0.0,0.0,neuroblastoma
+431,GSM1529327,SEQC_NB432 [2],Validation,F,582.0,3238,0,3238,0,HR,0,0,1.0,,0.0,0.0,neuroblastoma
+432,GSM1529328,SEQC_NB433 [2],Training,F,343.0,1242,0,1242,0,Non HR,0,0,1.0,,,,neuroblastoma
+433,GSM1529329,SEQC_NB434 [2],Validation,M,309.0,3045,0,3045,0,Non HR,0,0,0.0,,,,neuroblastoma
+434,GSM1529330,SEQC_NB435 [2],Training,F,282.0,1705,0,1705,0,Non HR,0,0,1.0,,,,neuroblastoma
+435,GSM1529331,SEQC_NB436 [2],Validation,M,972.0,3846,0,3846,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+436,GSM1529332,SEQC_NB437 [2],Training,F,792.0,8,1,12,1,HR,1,1,1.0,,1.0,1.0,neuroblastoma
+437,GSM1529333,SEQC_NB438 [2],Validation,M,936.0,438,1,454,1,HR,1,1,0.0,,1.0,1.0,neuroblastoma
+438,GSM1529334,SEQC_NB439 [2],Training,M,3636.0,814,1,928,1,HR,1,1,0.0,,1.0,1.0,neuroblastoma
+439,GSM1529335,SEQC_NB440 [2],Validation,M,3189.0,475,1,798,1,HR,1,1,0.0,,1.0,1.0,neuroblastoma
+440,GSM1529336,SEQC_NB441 [2],Training,M,435.0,2989,0,2989,0,Non HR,0,0,0.0,,,,neuroblastoma
+441,GSM1529337,SEQC_NB442 [2],Validation,F,1026.0,45,1,1174,1,HR,1,1,1.0,,1.0,1.0,neuroblastoma
+442,GSM1529338,SEQC_NB443 [2],Training,F,935.4,453,1,476,1,HR,1,1,1.0,,1.0,1.0,neuroblastoma
+443,GSM1529339,SEQC_NB444 [2],Validation,M,1547.0,322,1,593,1,HR,1,1,0.0,,1.0,1.0,neuroblastoma
+444,GSM1529340,SEQC_NB445 [2],Training,M,1113.0,147,1,218,1,HR,1,1,0.0,,1.0,1.0,neuroblastoma
+445,GSM1529341,SEQC_NB446 [2],Validation,M,1404.0,83,1,1187,1,HR,1,1,0.0,,1.0,1.0,neuroblastoma
+446,GSM1529342,SEQC_NB447 [2],Training,M,1275.0,424,1,1058,1,HR,1,1,0.0,,1.0,1.0,neuroblastoma
+447,GSM1529343,SEQC_NB448 [2],Validation,F,1573.0,123,1,600,0,HR,1,0,1.0,,1.0,0.0,neuroblastoma
+448,GSM1529344,SEQC_NB449 [2],Training,F,521.0,2739,0,2739,0,HR,0,0,1.0,,0.0,0.0,neuroblastoma
+449,GSM1529345,SEQC_NB450 [2],Validation,M,360.0,4890,0,4890,0,Non HR,0,0,1.0,,,,neuroblastoma
+450,GSM1529346,SEQC_NB451 [2],Training,M,330.0,4110,0,4110,0,Non HR,0,0,1.0,,,,neuroblastoma
+451,GSM1529347,SEQC_NB452 [2],Validation,F,240.0,1560,0,1560,0,Non HR,0,0,0.0,,,,neuroblastoma
+452,GSM1529348,SEQC_NB453 [2],Training,M,30.0,1290,0,1290,0,Non HR,0,0,0.0,,,,neuroblastoma
+453,GSM1529349,SEQC_NB454 [2],Validation,M,711.0,47,1,200,1,HR,1,1,0.0,,1.0,1.0,neuroblastoma
+454,GSM1529350,SEQC_NB455 [2],Training,M,519.0,2222,0,2222,0,Non HR,0,0,0.0,,,,neuroblastoma
+455,GSM1529351,SEQC_NB456 [2],Validation,M,410.0,317,1,495,1,HR,1,1,0.0,,1.0,1.0,neuroblastoma
+456,GSM1529352,SEQC_NB457 [2],Training,M,960.0,870,1,870,1,HR,1,1,,,1.0,1.0,neuroblastoma
+457,GSM1529353,SEQC_NB458 [2],Validation,F,1931.0,631,1,1397,1,HR,1,1,1.0,1.0,1.0,1.0,neuroblastoma
+458,GSM1529354,SEQC_NB459 [2],Training,M,34.0,1195,0,1195,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+459,GSM1529355,SEQC_NB460 [2],Validation,F,112.0,657,1,1391,0,HR,1,0,1.0,,1.0,0.0,neuroblastoma
+460,GSM1529356,SEQC_NB461 [2],Training,M,267.0,577,0,577,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+461,GSM1529357,SEQC_NB462 [2],Validation,F,166.0,652,0,652,0,Non HR,0,0,1.0,,,,neuroblastoma
+462,GSM1529358,SEQC_NB463 [2],Training,F,0.0,239,1,629,0,Non HR,1,0,1.0,,,,neuroblastoma
+463,GSM1529359,SEQC_NB464 [2],Validation,M,1289.0,101,1,167,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+464,GSM1529360,SEQC_NB465 [2],Training,F,137.0,404,0,404,0,HR,0,0,1.0,,0.0,0.0,neuroblastoma
+465,GSM1529361,SEQC_NB466 [2],Validation,F,1443.0,647,1,651,0,HR,1,0,1.0,,1.0,0.0,neuroblastoma
+466,GSM1529362,SEQC_NB467 [2],Training,M,2786.0,268,0,268,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+467,GSM1529363,SEQC_NB468 [2],Validation,M,456.0,121,1,176,0,Non HR,1,0,0.0,,,,neuroblastoma
+468,GSM1529364,SEQC_NB469 [2],Training,M,1022.0,636,1,648,0,HR,1,0,0.0,,1.0,0.0,neuroblastoma
+469,GSM1529365,SEQC_NB470 [2],Validation,M,225.0,2886,0,2886,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+470,GSM1529366,SEQC_NB471 [2],Training,F,25.0,2591,0,2591,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+471,GSM1529367,SEQC_NB472 [2],Validation,F,245.0,1235,0,1235,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+472,GSM1529368,SEQC_NB473 [2],Training,F,146.0,1788,0,1788,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+473,GSM1529369,SEQC_NB474 [2],Validation,F,17.0,33,1,1903,0,Non HR,1,0,1.0,,,,neuroblastoma
+474,GSM1529370,SEQC_NB475 [2],Training,M,1575.0,250,1,262,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+475,GSM1529371,SEQC_NB476 [2],Validation,F,860.0,1059,0,1059,0,Non HR,0,0,1.0,,,,neuroblastoma
+476,GSM1529372,SEQC_NB477 [2],Training,M,323.0,981,0,981,0,Non HR,0,0,0.0,,,,neuroblastoma
+477,GSM1529373,SEQC_NB478 [2],Validation,M,1468.0,3567,0,3567,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+478,GSM1529374,SEQC_NB479 [2],Training,F,1516.0,1531,0,1531,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+479,GSM1529375,SEQC_NB480 [2],Validation,M,1897.0,229,0,229,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+480,GSM1529376,SEQC_NB481 [2],Training,M,2045.0,383,0,383,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+481,GSM1529377,SEQC_NB482 [2],Validation,M,465.0,152,0,152,0,Non HR,0,0,0.0,,,,neuroblastoma
+482,GSM1529378,SEQC_NB483 [2],Training,F,259.0,715,1,1854,0,Non HR,1,0,1.0,,,,neuroblastoma
+483,GSM1529379,SEQC_NB484 [2],Validation,F,1546.0,187,0,187,0,HR,0,0,1.0,,0.0,0.0,neuroblastoma
+484,GSM1529380,SEQC_NB485 [2],Training,F,712.0,92,0,92,0,HR,0,0,1.0,,0.0,0.0,neuroblastoma
+485,GSM1529381,SEQC_NB486 [2],Validation,M,478.0,394,1,413,0,HR,1,0,0.0,,1.0,0.0,neuroblastoma
+486,GSM1529382,SEQC_NB487 [2],Training,M,162.0,1117,0,1117,0,HR,0,0,0.0,,0.0,0.0,neuroblastoma
+487,GSM1529383,SEQC_NB488 [2],Validation,F,212.0,995,0,995,0,Non HR,0,0,1.0,,,,neuroblastoma
+488,GSM1529384,SEQC_NB489 [2],Training,F,865.0,877,0,877,0,HR,0,0,1.0,,0.0,0.0,neuroblastoma
+489,GSM1529385,SEQC_NB490 [2],Validation,F,1759.0,1094,1,1098,0,HR,1,0,1.0,,1.0,0.0,neuroblastoma
+490,GSM1529386,SEQC_NB491 [2],Training,M,2326.0,691,1,987,0,HR,1,0,0.0,,1.0,0.0,neuroblastoma
+491,GSM1529387,SEQC_NB492 [2],Validation,M,947.0,738,1,892,1,HR,1,1,0.0,1.0,1.0,1.0,neuroblastoma
+492,GSM1529388,SEQC_NB493 [2],Training,M,190.0,4487,0,4487,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+493,GSM1529389,SEQC_NB494 [2],Validation,M,56.0,4828,0,4828,0,Non HR,0,0,0.0,0.0,,,neuroblastoma
+494,GSM1529390,SEQC_NB495 [2],Training,M,163.0,2467,0,2467,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+495,GSM1529391,SEQC_NB496 [2],Validation,M,132.0,105,1,5780,0,Non HR,1,0,0.0,,,,neuroblastoma
+496,GSM1529392,SEQC_NB497 [2],Training,F,379.0,4883,0,4883,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
+497,GSM1529393,SEQC_NB498 [2],Validation,F,530.0,2772,0,2772,0,Non HR,0,0,1.0,0.0,,,neuroblastoma
