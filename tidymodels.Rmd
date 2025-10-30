@@ -1,0 +1,100 @@
+---
+title: "tidymodels"
+author: "Marcelo Hurtado"
+date: "2025-10-24"
+output: html_document
+---
+
+```{r}
+library(tidymodels)
+library(tidysurv)       # helper package for survival metrics (if not installed, see note below)
+library(ranger)         # backend for random forest survival
+library(survival)
+library(censored)
+
+set.seed(42)
+```
+
+Prepare data
+```{r}
+# Recode: 1=censored, 2=event → 0/1
+lung$status <- ifelse(lung$status == 2, 1, 0)
+
+# Keep relevant columns
+lung <- lung[, c("time", "status", "age", "sex")]
+
+# Split train/test (optional)
+set.seed(42)
+data_split <- initial_split(lung, prop = 0.7)
+train_data <- training(data_split)
+test_data  <- testing(data_split)
+
+# Define 5-fold CV
+set.seed(42)
+cv_folds <- vfold_cv(train_data, v = 5)
+```
+
+Define the modeling recipe and model specification
+```{r}
+rsf_spec <- rand_forest(
+  mode  = "censored regression",
+  trees = 500,
+  mtry  = tune(),
+  min_n = tune()
+) %>%
+  set_engine("partykit")
+
+rsf_wf <- workflow() %>%
+  add_model(rsf_spec) %>%
+  add_formula(Surv(time, status) ~ age + sex)
+```
+
+Cross validation
+```{r}
+set.seed(42)
+rsf_grid <- grid_regular(
+  mtry(range = c(1, 3)),
+  min_n(range = c(5, 15)),
+  levels = 3
+)
+
+
+# Register the metric
+rsf_metrics <- metric_set(yardstick::concordance_survival)
+```
+
+Tune model
+```{r}
+# Tune
+set.seed(42)
+rsf_tuned <- tune_grid(
+  rsf_wf,
+  resamples = cv_folds,
+  grid = rsf_grid,
+  metrics = rsf_metrics
+)
+
+collect_metrics(rsf_tuned)
+```
+
+Select best combination
+```{r}
+best_rsf <- select_best(rsf_tuned, metric = "concordance_survival")
+```
+
+Fit model
+```{r}
+final_rsf <- finalize_workflow(rsf_wf, best_rsf)
+rsf_fit <- fit(final_rsf, data = lung)
+```
+
+Test dataset
+```{r}
+rsf_pred_time <- predict(rsf_fit, new_data = test_data, type = "time")
+risk_score <- -rsf_pred_time$.pred_time
+
+surv_obj <- with(test_data, Surv(time, status))
+test_cindex <- survival::concordance(surv_obj ~ risk_score)$concordance
+test_cindex
+```
+

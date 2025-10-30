@@ -1,0 +1,157 @@
+---
+title: "Custom_kfold_survival"
+author: "Marcelo Hurtado"
+date: "2025-10-25"
+output: html_document
+---
+
+```{r}
+source("machine_learning_survival.R")
+# Clean up and prepare dataset
+data <- na.omit(pbc) %>%
+  mutate(id = row_number(),
+         status_event = as.integer(status == 2))
+
+df_outcome  <- data %>% select(time, status_event)
+df_features <- data %>% select(-time, -status, -status_event)
+
+results <- cross_validation_custom(
+  df_features = df_features,
+  df_outcome = df_outcome,
+  outcome_col = "time",
+  event_col = "status_event",
+  ml_options = list(nb_folds = 3, nb_repeats = 1, ncores = 8),
+  file_name = "Test"
+)
+
+```
+
+```{r}
+library(survival)
+library(dplyr)
+library(censored)
+
+# Prepare data
+data(pbc)
+df <- na.omit(pbc) %>%
+  mutate(event = as.integer(status == 2)) %>%
+  select(time, event, age, albumin, bili, protime)
+
+set.seed(123)
+idx <- sample(seq_len(nrow(df)), size = 0.7 * nrow(df))
+train <- df[idx, ]
+test  <- df[-idx, ]
+
+# Fit Cox model
+cox_fit <- coxph(Surv(time, event) ~ age + albumin + bili + protime, data = train)
+
+# Predict on test
+test$.pred <- predict(cox_fit, newdata = test, type = "lp")
+
+# Compute C-index
+test_cindex <- concordance_survival_vec(
+  truth = Surv(test$time, test$event),
+  estimate = test$.pred
+)
+
+# Plot performance
+plot_survival_performance(
+  df_test = test,
+  c_index = test_cindex,
+  n_groups = 3,
+  title = "Cox model survival performance (test set)"
+)
+
+new_patient <- tibble(
+  age = 65,
+  albumin = 3.1,
+  bili = 2.0,
+  protime = 11.5
+)
+
+# Predict 1-year survival probability
+surv_curve <- survfit(cox_fit, newdata = new_patient)
+summary(surv_curve, times = 365)$surv
+
+#predict(cox_fit, new_patient, type = "survival", eval_time = 365)
+```
+
+LODO test
+```{r}
+# ===============================================================
+# Example: test LODO-stratified cross-validation
+# ===============================================================
+
+library(dplyr)
+library(rsample)
+library(purrr)
+library(tibble)
+library(parallel)
+
+# ----------------------------------------------------------------
+# 1. Simulate example dataset
+# ----------------------------------------------------------------
+set.seed(123)
+
+n <- 200
+n_batches <- 5
+
+df_features <- tibble(
+  x1 = rnorm(n),
+  x2 = runif(n),
+  x3 = rnorm(n, 2)
+)
+
+df_outcome <- tibble(
+  time  = rexp(n, rate = 0.05),
+  event = rbinom(n, 1, prob = 0.6),
+  cohort = sample(paste0("C", 1:n_batches), size = n, replace = TRUE)
+)
+
+
+# ----------------------------------------------------------------
+# 3. Test LODO stratification (by event + cohort)
+# ----------------------------------------------------------------
+message("\n=== LODO-style stratified CV (by cohort × event) ===")
+training_lodo <- cross_validation_custom(
+  df_features = df_features,
+  df_outcome  = df_outcome,
+  outcome_col = "time",
+  event_col   = "event",
+  ml_options  = list(nb_folds = 5, nb_repeats = 1, ncores = 2, LODO = TRUE, batch_id = "cohort")
+)
+
+# To inspect the stratification balance, rebuild the same structure manually
+df_all <- df_features %>% bind_cols(df_outcome) %>%
+  mutate(strata = interaction(cohort, event, drop = TRUE))
+
+folds_lodo <- rsample::vfold_cv(
+  df_all,
+  v = 5,
+  strata = "strata"
+)
+
+cat("\nEvent rate and cohort composition per fold (proportions):\n")
+
+# overall reference distribution in the full data
+ref_dist <- df_outcome %>%
+  count(cohort, event) %>%
+  mutate(prop = n / sum(n)) %>%
+  arrange(cohort, event)
+
+cat("\nReference distribution (full data):\n")
+print(ref_dist)
+
+for (i in seq_along(folds_lodo$splits)) {
+  fold_data <- rsample::analysis(folds_lodo$splits[[i]])
+  summary_tbl <- fold_data %>%
+    count(cohort, event) %>%
+    mutate(prop = n / sum(n)) %>%
+    arrange(cohort, event)
+  
+  cat(paste0("\nFold ", i, ":\n"))
+  print(summary_tbl)
+}
+
+```
+

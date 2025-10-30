@@ -1,0 +1,190 @@
+---
+title: "benchmark_survival_models"
+author: "Marcelo Hurtado"
+date: "2025-10-24"
+output: html_document
+---
+
+```{r}
+suppressPackageStartupMessages({
+library(tidyverse)
+library(tidymodels)
+library(survival)
+library(cowplot)
+library(future)
+library(censored)
+library(recipes)
+})
+theme_set(theme_cowplot())
+options(repr.plot.width = 15, repr.plot.height = 9)
+set.seed(42)
+```
+
+Prepare data
+```{r}
+data <- 
+    # remove rows with missing data
+    na.omit(pbc) |> 
+    # the surv variable will be our outcome
+    mutate(surv=Surv(time, status==2)) 
+dim(data)
+
+# separate 20% of the dataset for testing the models later
+data_split <- initial_split(data, prop = 0.8, strata=time)
+
+# create a recipe, to prepare the data for fitting
+rec <- recipe(surv ~ ., data=data) |>
+    # remove uneeded variables
+    step_rm(time, status, id) |> 
+    # remove variables with zero variance
+    step_zv(all_predictors()) |> 
+    # transform factors into integers
+    step_integer(all_nominal_predictors())
+```
+
+Model definitions
+
+These are the models we will be testing, they are provided by the censored package.
+
+note that some models, such as random forest, have hyper-parameters,
+
+these parameters are tunable, we will tune some of them to illustrate.
+
+```{r}
+models <- list(
+    cox_ph_survival = proportional_hazards(engine='survival'),
+    cox_ph_glmnet = proportional_hazards(penalty=tune(), mixture=tune(), engine='glmnet'),
+    survreg_flexsurv = survival_reg(engine='flexsurv'),
+    rand_forest_partykit = rand_forest(trees = tune(), engine='partykit'),
+    rand_forest_aorsf = rand_forest(trees = tune(), engine='aorsf'),
+    decision_tree_partykit = decision_tree(engine='partykit'),
+    boost_tree_mboost = boost_tree(trees = tune(), engine='mboost')
+) |>
+map(~set_mode(.x,'censored regression'))
+
+wsets <- workflow_set(
+    preproc=list(rec),
+    models=models
+)
+```
+
+Model fitting
+
+Now, we fit all the models with our training data,
+
+to evaluate which model is best, we will use cross-validation resampling, so each model will be fitted multiple times
+
+if there are tunable parameters, multiple fits will be done for each candidate parameter set,
+
+the number of candidates tested is controlled by the grid argument below.
+
+```{r}
+# 5-fold cross-validation resampling for the tunning and comparisons
+folds <- vfold_cv(training(data_split), v=5, strata=time)
+
+res <- workflow_map(
+    wsets,
+    "tune_grid",
+    seed = 42,
+    grid = 2,
+    resamples = folds,
+    times = 1427,
+    # this metric will be calculated for each fit
+    metrics=metric_set(concordance_survival)
+)
+```
+
+Metrics
+
+During the fit, the concordance index was calculated for each combination,
+
+now we can gather these results and build a table:
+
+```{r}
+# collect metrics from the result object
+m <- collect_metrics(res)
+# remove a few unrelated columns
+mb <- mutate(m,
+    label = gsub('recipe_', '', wflow_id),
+    preproc=NULL,
+    .estimator=NULL,
+    n=NULL,
+    .metric=NULL
+) |>
+# select the best parameter set for each model, according to the metric
+slice_max(mean, by=label, n=1, with_ties=FALSE)
+mb
+```
+
+Note that since we are using cross-validation, each model was fitted multiple times, so we have a mean and std_err.
+
+we can also fit these models with the 20% test data we separated earlier:
+
+```{r}
+final_fits <- 
+    # map across each model in the table above
+    set_names(mb$wflow_id) |>
+    map(function(wi) {
+        # select the best model config, in case of tunnable parameters
+        bwr <- extract_workflow_set_result(res, wi)
+        best_params <- select_best(bwr, metric='concordance_survival')
+        bw <- finalize_workflow(
+            extract_workflow(res, wi), 
+            best_params
+        )
+    
+        # re-fit the best config with the initial 80% train / 20% test
+        last_fit(
+            bw,
+            split = data_split,
+            metrics = metric_set(concordance_survival)
+        )
+    })
+
+test_m <-
+    # collect the metrics of the final model
+    map(final_fits, collect_metrics) |>
+    bind_rows(.id='wflow_id') |>
+    select(wflow_id, test_metric=.estimate)
+
+test_m
+```
+
+To make it easier to visualize all these results, we can make a plot
+
+the validation mean and std_err will be plotted in black as a point and error bar,
+
+and for comparison, we added a cross to indicate the score of the fully fitted model on the test set.
+
+```{r}
+inner_join(mb, test_m, by='wflow_id') |>
+ggplot(aes(y=fct_reorder(label,mean), x=mean)) +
+geom_point(size=4) +
+geom_point(aes(x=test_metric), shape=3, size=3, stroke=3, color='darkred') +
+geom_pointrange(aes(xmin=mean-std_err, xmax=mean+std_err)) +
+labs(x='concordance index', y='models')
+```
+
+Variable importance¶
+Once we decide which model we want to use, we can extract the model object, and do further analyses,
+
+such as ranking the dataset variables by how important the model scored them.
+
+```{r}
+names(final_fits)
+
+aorsf_obj <-
+    final_fits[['recipe_rand_forest_aorsf']] |>
+    extract_fit_engine()
+aorsf_obj
+```
+
+```{r}
+aorsf_obj$get_importance_clean() |>
+enframe() |>
+ggplot(aes(y=fct_reorder(name, value), x=value)) +
+geom_col() +
+labs(x='aorsf model variable importance', y='variable')
+```
+
+

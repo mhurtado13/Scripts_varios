@@ -1,0 +1,314 @@
+---
+title: "Models_Cindex"
+author: "Marcelo Hurtado"
+date: "2025-10-23"
+output: html_document
+---
+
+```{r}
+library(survival)
+```
+
+C-index
+```{r}
+library(survival)
+
+set.seed(42)
+
+# Split into training and test sets
+n <- nrow(lung)
+train_idx <- sample(seq_len(n), size = 0.7 * n)
+train_data <- lung[train_idx, ]
+test_data  <- lung[-train_idx, ]
+
+# Fit Cox model on training data
+cox_model <- coxph(Surv(time, status) ~ age + sex, data = train_data)
+
+# Predict on independent test set
+lp_test <- predict(cox_model, newdata = test_data, type = "lp")
+
+# Compute concordance index on the test set
+cindex <- concordance(Surv(test_data$time,
+                           test_data$status) ~ lp_test)
+
+# Output
+cindex
+cat("Test-set C-index:", round(cindex$concordance, 3), "\n")
+
+```
+
+Performance
+```{r}
+# Create risk groups based on predicted risk
+lung$risk <- cut(predict(cox_model), breaks=quantile(predict(cox_model), probs=0:3/3),
+                 labels=c("Low", "Medium", "High"), include.lowest=TRUE)
+
+# Plot Kaplan-Meier survival curves by risk group
+library(survminer)
+ggsurvplot(survfit(Surv(time, status) ~ risk, data=lung),
+           data=lung, pval=TRUE, risk.table=TRUE)
+```
+
+Random forest
+```{r}
+library(survival)
+library(randomForestSRC)
+library(survcomp)
+
+set.seed(42)
+
+# 1) Split into training (70%) and test (30%)
+n <- nrow(lung)
+train_idx <- sample(seq_len(n), size = 0.7 * n)
+train_data <- lung[train_idx, ]
+test_data  <- lung[-train_idx, ]
+
+# 2) Fit RSF on the training data
+# - RSF handles missing values internally; we set na.action="na.impute" explicitly for clarity.
+rsf_model <- rfsrc(
+  Surv(time, status) ~ age + sex,
+  data = train_data,
+  ntree = 1000,          # more trees -> stabler predictions
+  nodesize = 15,         # small default is fine; tune if you like
+  nsplit = 10            # randomized splits; speeds up
+)
+
+# 3) Predict on the independent test set
+#    This returns survival info over a time grid for each test subject.
+pred_test <- predict(rsf_model, newdata = test_data)
+
+# 4) Turn the prediction into a single risk score per subject
+#    Use the cumulative hazard at the last time point as a scalar risk (higher = riskier).
+risk_test <- pred_test$chf
+risk_test <- risk_test[, ncol(risk_test), "condCHF.1"]
+
+# 5) Build Surv() for the test set and compute the C-index
+#    survcomp::concordance.index expects event as 0/1 (1=event). The lung dataset uses 1=censored, 2=event,
+#    so we recode to 0/1 explicitly.
+event_test <- as.integer(test_data$status == 2)
+
+c_rsf <- concordance.index(
+  x = risk_test,
+  surv.time  = test_data$time,
+  surv.event = event_test
+)
+
+c_rsf$c.index
+
+```
+
+Lasso and elastic net
+```{r}
+library(survival)
+library(glmnet)
+library(survcomp)
+
+set.seed(42)
+
+# 1️⃣ Recode event variable: 1 = event, 0 = censored
+lung$status <- ifelse(lung$status == 2, 1, 0)
+
+# 2️⃣ Split into training and test sets
+n <- nrow(lung)
+train_idx <- sample(seq_len(n), size = 0.7 * n)
+train_data <- lung[train_idx, ]
+test_data  <- lung[-train_idx, ]
+
+# 3️⃣ Prepare model matrices (glmnet needs x matrix, y Surv object)
+x_train <- model.matrix(~ age + sex, data = train_data)[, -1] # remove intercept
+y_train <- Surv(train_data$time, train_data$status)
+
+x_test  <- model.matrix(~ age + sex, data = test_data)[, -1]
+
+# 4️⃣ Fit penalized Cox model with cross-validation to choose lambda
+fit_glmnet <- cv.glmnet(x_train, y_train, family = "cox", alpha = 1) # alpha=1 = Lasso
+
+# 5️⃣ Predict linear predictor (risk score) on test set
+lp_glmnet <- predict(fit_glmnet, newx = x_test, s = "lambda.min", type = "link")[,1]
+
+# 6️⃣ Compute concordance index on the test set
+c_glmnet <- concordance.index(
+  x = lp_glmnet,
+  surv.time  = test_data$time,
+  surv.event = test_data$status
+)
+
+c_glmnet$c.index
+
+### ELASTIC NET
+fit_enet <- cv.glmnet(x_train, y_train, family = "cox", alpha = 0.5)  # 0.5 = equal mix
+lp_enet <- predict(fit_enet, newx = x_test, s = "lambda.min", type = "link")[,1]
+c_enet <- concordance.index(lp_enet, surv.time = test_data$time, surv.event = test_data$status)
+c_enet$c.index
+
+```
+
+Cox boosting
+```{r}
+library(survival)
+library(gbm)
+library(survcomp)
+
+set.seed(42)
+
+# 1️⃣ Recode event variable: 1 = event, 0 = censored
+lung$status <- ifelse(lung$status == 2, 1, 0)
+
+# 2️⃣ Split into training and test sets
+n <- nrow(lung)
+train_idx <- sample(seq_len(n), size = 0.7 * n)
+train_data <- lung[train_idx, ]
+test_data  <- lung[-train_idx, ]
+
+# 3️⃣ Fit gradient boosting model (CoxPH loss)
+gbm_model <- gbm(
+  formula = Surv(time, status) ~ age + sex,
+  data = train_data,
+  distribution = "coxph",
+  n.trees = 2000,
+  interaction.depth = 3,
+  shrinkage = 0.01,   # small learning rate
+  bag.fraction = 0.8, # stochastic boosting
+  train.fraction = 1.0,
+  n.cores = 1,        # parallelization optional
+  verbose = FALSE
+)
+
+# 4️⃣ Predict log-risk scores (linear predictor) on the test set
+lp_gbm <- predict(gbm_model, newdata = test_data, n.trees = 2000, type = "link")
+
+# 5️⃣ Compute concordance index on the test set
+c_gbm <- concordance.index(
+  x = lp_gbm,
+  surv.time  = test_data$time,
+  surv.event = test_data$status
+)
+
+c_gbm$c.index
+
+```
+
+xgboost
+```{r}
+library(survival)
+library(xgboost)
+library(survcomp)
+
+set.seed(42)
+
+# 1️⃣ Recode status: 1=censored, 2=event → 0=censored, 1=event
+lung$status <- ifelse(lung$status == 2, 1, 0)
+
+# 2️⃣ Train/test split
+n <- nrow(lung)
+train_idx <- sample(seq_len(n), size = 0.7 * n)
+train_data <- lung[train_idx, ]
+test_data  <- lung[-train_idx, ]
+
+# 3️⃣ Prepare matrices
+x_train <- model.matrix(~ age + sex, data = train_data)[, -1]
+x_test  <- model.matrix(~ age + sex, data = test_data)[, -1]
+
+# 4️⃣ Create DMatrix — include survival time and event
+#    XGBoost needs event = 1 for death, 0 for censor
+dtrain <- xgb.DMatrix(data = x_train, label = train_data$time)
+setinfo(dtrain, "label_lower_bound", train_data$time)
+setinfo(dtrain, "label_upper_bound", train_data$time)
+setinfo(dtrain, "weight", train_data$status)  # event indicator used as weight (0=censored)
+
+# 5️⃣ Fit model
+params <- list(
+  objective = "survival:cox",
+  eval_metric = "cox-nloglik",
+  eta = 0.05,
+  max_depth = 3
+)
+
+xgb_model <- xgb.train(
+  params = params,
+  data = dtrain,
+  nrounds = 300,
+  verbose = 0
+)
+
+# 6️⃣ Predict on test set
+lp_xgb <- predict(xgb_model, newdata = x_test)
+
+# 7️⃣ Compute concordance index
+c_xgb <- concordance.index(
+  x = lp_xgb,
+  surv.time  = test_data$time,
+  surv.event = test_data$status
+)
+
+c_xgb$c.index
+```
+
+
+########################## CROSS VALIDATION CARET + C-Index
+
+```{r}
+library(survival)
+library(randomForestSRC)
+library(survcomp)
+
+set.seed(42)
+
+# 1️⃣ Prepare data
+# Recode event: 1=censored, 2=event -> 0/1
+lung$status <- ifelse(lung$status == 2, 1, 0)
+
+# 2️⃣ Define CV parameters
+K <- 5                                    # number of folds
+n <- nrow(lung)
+folds <- sample(rep(1:K, length.out = n)) # random fold assignment
+
+cindex_values <- numeric(K)               # store C-index for each fold
+
+# 3️⃣ Run K-fold cross-validation manually
+for (k in 1:K) {
+  cat("\nFold", k, "of", K, "\n")
+  
+  # Split data
+  train_data <- lung[folds != k, ]
+  test_data  <- lung[folds == k, ]
+  
+  # Fit RSF model
+  rsf_model <- rfsrc(Surv(time, status) ~ age + sex + ph.ecog,
+                     data = train_data,
+                     ntree = 500,
+                     na.action = "na.impute")
+  
+  # Predict on test data
+  pred_test <- predict(rsf_model, newdata = test_data, na.action = "na.impute")
+  
+  # Extract risk scores (cumulative hazard at final time point)
+  risk_test <- pred_test$chf
+  if (is.matrix(risk_test)) {
+    risk_test <- risk_test[, ncol(risk_test)]
+  } else if (length(dim(risk_test)) == 3) {
+    risk_test <- risk_test[, ncol(risk_test), "condCHF.1"]
+  } else {
+    risk_test <- as.numeric(risk_test)
+  }
+  
+  # Compute C-index on this fold
+  ci <- concordance.index(
+    x = risk_test,
+    surv.time  = test_data$time,
+    surv.event = test_data$status
+  )$c.index
+  
+  cindex_values[k] <- ci
+  cat("Fold", k, "C-index:", round(ci, 3), "\n")
+}
+
+# 4️⃣ Average performance across folds
+mean_cindex <- mean(cindex_values)
+sd_cindex <- sd(cindex_values)
+
+cat("\nAverage C-index across", K, "folds:", round(mean_cindex, 3),
+    "(±", round(sd_cindex, 3), ")\n")
+
+```
+
