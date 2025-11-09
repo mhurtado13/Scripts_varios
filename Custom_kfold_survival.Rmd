@@ -155,3 +155,43 @@ for (i in seq_along(folds_lodo$splits)) {
 
 ```
 
+```{r}
+source("~/Documents/pipeML/R/machine_learning.R")
+```
+
+```{r}
+raw.counts = pipeML::raw.counts
+traitData = pipeML::traitData
+deconv = pipeML::deconvolution
+```
+
+```{r}
+source("~/Documents/CellTFusion/R/CellTFusion.R")
+library(CellTFusion)
+library(dplyr)
+universe <- decoupleR::get_collectri(organism = 'human', split_complexes = FALSE)
+paths <- decoupleR::get_progeny(organism = 'human', top = 500)
+set.seed(123)
+res_groups = compute_features.training.ML(features_train = as.data.frame(t(raw.counts)), 
+                                          task = "survival",
+                                          time_var = traitData$os, 
+                                          event_var = traitData$Best.Confirmed.Overall.Response,
+                                          trait.positive = "PD",
+                                          stack = F, 
+                                          k_folds = 2, 
+                                          n_rep = 1, 
+                                          LODO = F, 
+                                          file_name = "Training_test", 
+                                          ncores =  4,                                                                                        
+                                          return = T,
+                                          fold_construction_fun = prepare_CellTFusion_folds, 
+                                          fold_construction_args_fixed = list(deconv = deconv, universe = universe, paths = paths, ncores = 4,
+                                                                        normalized = TRUE, coldata = traitData, time_var = traitData$os, 
+                                                                        event_var = traitData$Best.Confirmed.Overall.Response,
+                                                                        trait = "Best.Confirmed.Overall.Response", trait.positive = "PD",
+                                                                        min_targets_size = c(10), minMod = c(20), 
+                                                                                corr_mod = c(0.7), corr = c(0.7), high_corr_groups = 0.9),
+                                          fold_construction_args_tunable = list(min_targets_size = c(5, 10), minMod = c(15, 20), 
+                                                                                corr_mod = c(0.7), corr = c(0.7), high_corr_groups = 0.9))
+```
+
