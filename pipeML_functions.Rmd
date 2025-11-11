@@ -1,0 +1,310 @@
+---
+title: "pipeML_functions"
+author: "Marcelo Hurtado"
+date: "2025-11-09"
+output: html_document
+---
+
+```{r}
+library(pipeML)
+library(caret)
+library(dplyr)
+library(doParallel)
+library(survival)
+library(tidymodels)
+library(censored)
+```
+
+Simple ML model
+```{r}
+deconvolution = pipeML::deconvolution
+traitData = pipeML::traitData
+res <- compute_features.training.ML(features_train = deconvolution, 
+                                    target_var = traitData$Best.Confirmed.Overall.Response,
+                                    task_type = "classification",
+                                    trait.positive = "CR",
+                                    metric = "AUROC",
+                                    stack = FALSE,
+                                    k_folds = 2,
+                                    n_rep = 2,
+                                    LODO = FALSE,
+                                    batch_id = NULL,
+                                    file_name = "Test",
+                                    ncores = 2,
+                                    return = TRUE)
+```
+
+Simple stack ML model
+```{r}
+deconvolution = pipeML::deconvolution
+traitData = pipeML::traitData
+res <- compute_features.training.ML(features_train = deconvolution, 
+                                    target_var = traitData$Best.Confirmed.Overall.Response,
+                                    task_type = "classification",
+                                    trait.positive = "CR",
+                                    metric = "AUROC",
+                                    stack = TRUE,
+                                    k_folds = 2,
+                                    n_rep = 2,
+                                    LODO = FALSE,
+                                    batch_id = NULL,
+                                    file_name = "Test",
+                                    ncores = 2,
+                                    return = TRUE)
+```
+
+Custom folds construction
+```{r}
+# These parameters are taking care inside pipeML automatically once `fold_construction_fun` is set. Be sure to not change the parameteres names.
+#' @param data Data from which the custom function will be performed 
+#' @param folds A list of integer vectors indicating row indices for the training set in each fold. 
+#' 
+prepare_TFs_folds <- function(data, folds = NULL, bestune = NULL, ncores = NULL, time_var = NULL, 
+                              event_var = NULL, trait.positive = NULL, tfs.universe = NULL) {
+
+  if(!is.null(bestune)){
+    # Run TFs on the full training set
+    obs_train <- NULL
+
+    if ("target" %in% colnames(data)) {
+      obs_train <- data$target
+      data$target <- NULL
+    } else if (!is.null(time_var) && !is.null(event_var)) {
+      obs_train <- list(time = time_var, event = as.numeric(event_var == trait.positive))
+    } else {
+      stop("Either 'target' or both 'time_var' and 'event_var' must be provided.")
+    }
+
+    train_processed_final <- CellTFusion::compute.TFs.activity(t(data), universe = tfs.universe) ################################ User can change this part
+    colnames(train_processed_final) <- gsub("[- +]", ".", colnames(train_processed_final)) ## Just to change special characters (ignore in other cases)
+
+    # Get features
+    train_cell_data_final <- train_processed_final %>% data.frame()
+
+    if (is.list(obs_train)) {
+      train_cell_data_final <- train_cell_data_final %>%
+        dplyr::mutate(time = obs_train$time, event = obs_train$event)
+    } else {
+      train_cell_data_final <- train_cell_data_final %>%
+        dplyr::mutate(target = obs_train)
+    }
+
+    custom_output = NULL
+    res = list(train_cell_data_final, custom_output, bestune)
+
+    return(res)
+
+  } else { ### Means best tune need to be find
+
+    ### Implement parallelization
+    if(is.null(ncores) == TRUE){
+      ncores = parallel::detectCores() - 2
+    }
+
+    cl <- parallel::makeCluster(ncores)
+    doParallel::registerDoParallel(cl)
+
+    # Parallelize over folds
+    processed_folds <- foreach::foreach(i = seq_along(folds), .packages = c("dplyr", "CellTFusion")) %dopar% {
+
+      cat("Starting fold", names(folds)[i], "\n")
+
+      train_idx <- folds[[i]]
+      test_idx <- setdiff(seq_len(nrow(data)), train_idx)
+
+      ## Subset data
+      train_data <- data[train_idx, , drop = FALSE]
+
+      # Determine target or time/event
+      if ("target" %in% colnames(train_data)) {
+        obs_train <- train_data$target
+        train_data$target <- NULL
+      } else if (!is.null(time_var) && !is.null(event_var)) {
+        obs_train <- list(
+          time  = time_var[train_idx],
+          event = as.numeric(event_var[train_idx] == trait.positive)
+        )
+      } else {
+        stop("Either 'target' or both 'time_var' and 'event_var' must be provided.")
+      }
+
+      ## Run TFs once
+      train_processed <- CellTFusion::compute.TFs.activity(t(train_data), return = F, universe = tfs.universe) ##################### User can change this part
+      colnames(train_processed) <- gsub("[- +]", ".", colnames(train_processed)) ## Just to change special characters (ignore in other cases)
+
+      train_cell_data <- train_processed %>% data.frame()
+
+      if (is.list(obs_train)) {
+        train_cell_data <- train_cell_data %>%
+          dplyr::mutate(time = obs_train$time, event = obs_train$event)
+      } else {
+        train_cell_data <- train_cell_data %>%
+          dplyr::mutate(target = obs_train)
+      }
+
+      ## Prepare test data using trained info
+      obs_test <- if ("target" %in% colnames(data)) {
+        data$target[test_idx]
+      } else if (!is.null(time_var) && !is.null(event_var)) {
+        list(time = time_var[test_idx], event = as.numeric(event_var[test_idx] == trait.positive))
+      } else {
+        NULL
+      }
+
+      test_data <- data[test_idx, , drop = FALSE]
+      if ("target" %in% colnames(test_data)) test_data$target <- NULL
+
+      test_data <- CellTFusion::compute.TFs.activity(t(test_data), return = F, universe = tfs.universe) ########################## User can change this part
+      colnames(test_data) <- gsub("[- +]", ".", colnames(test_data)) ## Just to change special characters (ignore in other cases)
+
+      if (is.list(obs_test)) {
+        test_data <- test_data %>%
+          dplyr::mutate(time = obs_test$time, event = obs_test$event)
+      }
+
+      list(
+        train_data = train_cell_data,
+        test_data = test_data,
+        obs_test = obs_test,
+        rowIndex = test_idx,
+        fold_name = names(folds)[i]
+      )
+      
+    }
+
+    parallel::stopCluster(cl)
+    unregister_dopar() #Stop Dopar from running in the background
+
+    for (i in seq_along(processed_folds)) {
+      filename = file.path("Results", paste0("fold_", names(folds)[i], ".rds"))
+      saveRDS(processed_folds[[i]], file = filename)
+    }
+  }
+}
+```
+
+ML model with custom function
+```{r}
+deconvolution = pipeML::deconvolution
+traitData = pipeML::traitData
+counts = pipeML::raw.counts
+universe = decoupleR::get_collectri(organism = "human", split_complexes = F)
+## counts_train: Normalized counts to compute the features from the training samples
+## traitData_train: Target variable from the training samples
+res = compute_features.training.ML(features_train = as.data.frame(t(counts)), 
+                                   target_var = traitData$Best.Confirmed.Overall.Response, 
+                                   task_type = 'classification',
+                                   trait.positive = "CR", 
+                                   metric = "AUROC", file_name = "Test",
+                                   stack = F, k_folds = 2, 
+                                   n_rep = 2, LODO = F, 
+                                   ncores = 2, return = T, 
+                                   fold_construction_fun = prepare_TFs_folds,
+                                   fold_construction_args_fixed = list(ncores = ncores, trait.positive = "CR", tfs.universe = universe),
+                                   fold_construction_args_tunable = NULL)
+```
+
+ML model with custom function and tunable parameters
+```{r}
+universe <- decoupleR::get_collectri(organism = 'human', split_complexes = FALSE)
+paths <- decoupleR::get_progeny(organism = 'human', top = 500)
+res = compute_features.training.ML(features_train = as.data.frame(t(counts)), 
+                                   target_var = traitData$Best.Confirmed.Overall.Response, 
+                                   task_type = 'classification',
+                                   trait.positive = "CR", 
+                                   metric = "AUROC", file_name = "Test",
+                                   stack = F, k_folds = 2, 
+                                   n_rep = 2, LODO = F, 
+                                   ncores = 2, return = T, 
+                                   fold_construction_fun = prepare_CellTFusion_folds,
+                                   fold_construction_args_fixed = list(deconv = deconvolution, universe = universe, paths = paths, 
+                                                                       ncores = ncores, normalized = FALSE, 
+                                                                       coldata = traitData, 
+                                                                       trait = "Best.Confirmed.Overall.Response", trait.positive = "CR"),
+                                   fold_construction_args_tunable = list(min_targets_size = c(5, 10), minMod = 5,
+                                                                         corr_mod = 0.7, corr = 0.9, high_corr_groups = 0.9))
+```
+
+#############################################
+
+Simple ML model survival
+```{r}
+library(censored)
+library(tidymodels)
+source("~/Documents/pipeML/R/machine_learning.R")
+deconvolution = pipeML::deconvolution
+traitData = pipeML::traitData
+deconv = multideconv::compute.deconvolution.analysis(deconvolution)
+res <- compute_features.training.ML(features_train = deconv[[1]], 
+                                    time_var = traitData$os,
+                                    event_var = traitData$Best.Confirmed.Overall.Response,
+                                    task_type = "survival",
+                                    trait.positive = "CR",
+                                    metric = "AUROC",
+                                    stack = FALSE,
+                                    k_folds = 2,
+                                    n_rep = 2,
+                                    LODO = FALSE,
+                                    batch_id = NULL,
+                                    file_name = "Test",
+                                    ncores = 2,
+                                    fold_construction_fun = NULL,
+                                    fold_construction_args_fixed = NULL, 
+                                    fold_construction_args_tunable = NULL,
+                                    return = TRUE)
+```
+
+ML model survival with custom function
+```{r}
+source("~/Documents/CellTFusion/R/CellTFusion.R")
+source("~/Documents/pipeML/R/machine_learning.R")
+universe <- decoupleR::get_collectri(organism = 'human', split_complexes = FALSE)
+paths <- decoupleR::get_progeny(organism = 'human', top = 500)
+set.seed(123)
+res_groups = compute_features.training.ML(features_train = as.data.frame(t(raw.counts)), 
+                                          task_type = "survival",
+                                          time_var = traitData$os, 
+                                          event_var = traitData$Best.Confirmed.Overall.Response,
+                                          trait.positive = "PD",
+                                          stack = F, 
+                                          k_folds = 2, 
+                                          n_rep = 1, 
+                                          LODO = F, 
+                                          file_name = "Training_test", 
+                                          ncores =  4,                                                                                        
+                                          return = T,
+                                          fold_construction_fun = prepare_CellTFusion_folds, 
+                                          fold_construction_args_fixed = list(deconv = deconvolution, universe = universe, paths = paths, ncores = 4,
+                                                                        normalized = TRUE, coldata = traitData, time_var = traitData$os, 
+                                                                        event_var = traitData$Best.Confirmed.Overall.Response,
+                                                                        trait = "Best.Confirmed.Overall.Response", trait.positive = "PD"),
+                                          fold_construction_args_tunable = list(min_targets_size = c(5, 10), minMod = c(15, 20), 
+                                                                                corr_mod = c(0.7), corr = c(0.7), high_corr_groups = 0.9))
+```
+
+ML model survival with custom function (no tunable params)
+```{r}
+source("~/Documents/CellTFusion/R/CellTFusion.R")
+library(CellTFusion)
+set.seed(123)
+res_groups = compute_features.training.ML(features_train = as.data.frame(t(raw.counts)), 
+                                          task_type = "survival",
+                                          time_var = traitData$os, 
+                                          event_var = traitData$Best.Confirmed.Overall.Response,
+                                          trait.positive = "PD",
+                                          stack = F, 
+                                          k_folds = 2, 
+                                          n_rep = 1, 
+                                          LODO = F, 
+                                          file_name = "Training_test", 
+                                          ncores =  4,                                                                                        
+                                          return = T,
+                                          fold_construction_fun = prepare_CellTFusion_folds, 
+                                          fold_construction_args_fixed = list(deconv = deconvolution, universe = universe, paths = paths, ncores = 4,
+                                                                        normalized = TRUE, coldata = traitData, time_var = traitData$os, 
+                                                                        event_var = traitData$Best.Confirmed.Overall.Response,
+                                                                        trait = "Best.Confirmed.Overall.Response", trait.positive = "PD",
+                                                                        min_targets_size = 5, minMod = 15, 
+                                                                                corr_mod = 0.7, corr = 0.7, high_corr_groups = 0.9),
+                                          fold_construction_args_tunable = NULL)
+```
