@@ -206,6 +206,7 @@ res = compute_features.training.ML(features_train = as.data.frame(t(counts)),
 
 ML model with custom function and tunable parameters
 ```{r}
+source("~/Documents/pipeML/R/machine_learning.R")
 universe <- decoupleR::get_collectri(organism = 'human', split_complexes = FALSE)
 paths <- decoupleR::get_progeny(organism = 'human', top = 500)
 res = compute_features.training.ML(features_train = as.data.frame(t(counts)), 

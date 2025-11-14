@@ -1,0 +1,928 @@
+---
+title: "Benchmark_pipeML"
+author: "Marcelo Hurtado"
+date: "2025-11-11"
+output: html_document
+---
+
+Setup
+```{r}
+# ============================================================
+# Setup
+# ============================================================
+library(h2o)
+library(mlbench)
+```
+
+Cell groups 
+```{r, eval = FALSE}
+library(multideconv)
+library(CellTFusion)
+counts = read.csv("~/Documents/LungPredict_late_stage/Data/Gobbini/Raw_files/counts_raw.csv", row.names = 1)
+clinical = read.csv("~/Documents/LungPredict_late_stage/Data/Gobbini/Raw_files/clinical_data_response.csv", row.names = 1)
+counts = counts[,rownames(clinical)]
+deconv = read.csv("~/Documents/LungPredict_late_stage/Data/Gobbini/Raw_files/Deconvolution_LP_Gobbini.csv", row.names = 1)
+deconv_test = read.csv("~/Documents/LungPredict_late_stage/Data/Captier/Deconvolution_Captier.csv", row.names = 1)
+
+deconv = deconv[,colnames(deconv)%in%colnames(deconv_test)]
+deconv_test = deconv_test[,colnames(deconv_test)%in%colnames(deconv)]
+
+cell.groups = CellTFusion(counts, deconv, normalized = T, coldata = clinical,
+                          trait = "R.NR", trait.positive = "NR" )
+
+df = cbind(cell.groups[["Processed_deconvolution"]][["Deconvolution matrix"]], R.NR = clinical$R.NR)
+```
+
+```{r, eval = FALSE}
+h2o.init(nthreads = -1, max_mem_size = "4G")
+
+# Convert to H2O frame
+df_h2o <- as.h2o(df)
+x <- setdiff(names(df), "R.NR")
+y <- "R.NR"
+df_h2o[, y] <- as.factor(df_h2o[, y])
+
+# ============================================================
+# Run AutoML with internal cross-validation
+# ============================================================
+aml <- h2o.automl(
+  x = x,
+  y = y,
+  training_frame = df_h2o,
+  nfolds = 5,              # 5-fold cross-validation
+  max_models = 10,         # number of models to try
+  max_runtime_secs = 60,   # quick example
+  seed = 1234
+)
+
+# ============================================================
+# Inspect leaderboard with CV metrics
+# ============================================================
+# The leaderboard by default shows leaderboard-frame metrics,
+# but we can request CV-based metrics directly:
+lb <- h2o.get_leaderboard(aml, extra_columns = "ALL")
+print(lb)
+
+# ============================================================
+# Extract and inspect cross-validation performance for each model
+# ============================================================
+model_ids <- as.data.frame(lb$model_id)[, 1]
+
+cv_results <- lapply(model_ids, function(id) {
+  m <- h2o.getModel(id)
+  perf <- m@model$cross_validation_metrics_summary
+
+  # ✅ Extract cross-validated means and standard deviations
+  auc_mean   <- as.numeric(perf["auc", "mean"])
+  auc_sd     <- as.numeric(perf["auc", "sd"])
+  auprc_mean <- as.numeric(perf["pr_auc", "mean"])
+  auprc_sd   <- as.numeric(perf["pr_auc", "sd"])
+  acc_mean   <- as.numeric(perf["accuracy", "mean"])
+  acc_sd     <- as.numeric(perf["accuracy", "sd"])
+
+  data.frame(
+    model = id,
+    AUC_mean = auc_mean, AUC_sd = auc_sd,
+    AUPRC_mean = auprc_mean, AUPRC_sd = auprc_sd,
+    Accuracy_mean = acc_mean, Accuracy_sd = acc_sd
+  )
+})
+
+cv_results_df <- do.call(rbind, cv_results)
+cv_results_df <- cv_results_df[order(-cv_results_df$AUPRC_mean), ]
+
+# Show results
+print(cv_results_df)
+
+# ============================================================
+# 🎨 Plot Cross-validated AUROC and AUPRC (mean ± SD)
+# ============================================================
+# ============================================================
+# 🎨 Robust plotting of CV AUROC and AUPRC (mean ± SD)
+# ============================================================
+if (requireNamespace("ggplot2", quietly = TRUE)) {
+  library(ggplot2)
+
+  # Ensure model is a factor with fixed order (by AUPRC_mean)
+  cv_results_df$model <- factor(
+    cv_results_df$model,
+    levels = cv_results_df$model[order(cv_results_df$AUPRC_mean)]
+  )
+
+  # --- AUROC plot ---
+  p_auc <- ggplot(cv_results_df, aes(x = model, y = AUC_mean)) +
+    geom_col(fill = "#3182bd", width = 0.6) +
+    geom_errorbar(
+      aes(ymin = AUC_mean - AUC_sd, ymax = AUC_mean + AUC_sd),
+      width = 0.25, color = "black"
+    ) +
+    coord_flip() +
+    labs(
+      title = "Cross-validated AUROC (mean ± SD)",
+      x = "Model",
+      y = "AUC (5-fold CV)"
+    ) +
+    theme_minimal(base_size = 13)
+
+  # --- AUPRC plot ---
+  p_auprc <- ggplot(cv_results_df, aes(x = model, y = AUPRC_mean)) +
+    geom_col(fill = "#e6550d", width = 0.6) +
+    geom_errorbar(
+      aes(ymin = AUPRC_mean - AUPRC_sd, ymax = AUPRC_mean + AUPRC_sd),
+      width = 0.25, color = "black"
+    ) +
+    coord_flip() +
+    labs(
+      title = "Cross-validated AUPRC (mean ± SD)",
+      x = "Model",
+      y = "AUPRC (5-fold CV)"
+    ) +
+    theme_minimal(base_size = 13)
+
+  print(p_auc)
+  print(p_auprc)
+
+}
+
+# ============================================================
+# Shutdown (optional)
+# ============================================================
+# h2o.shutdown(prompt = FALSE)
+```
+
+Hyperparams
+```{r, eval = FALSE}
+library(dplyr)
+library(purrr)
+
+# Get leaderboard and model IDs
+lb <- as.data.frame(h2o.get_leaderboard(aml, extra_columns = "ALL"))
+model_ids <- lb$model_id
+
+# Extract model type and hyperparameters
+hp_summary <- map_dfr(model_ids, function(id) {
+  m <- h2o.getModel(id)
+  
+  # Extract model family (prefix of ID)
+  family <- sub("_.*", "", id)
+  
+  # Extract parameter list
+  params <- m@parameters
+  
+  # Keep only meaningful tuning parameters (exclude frame refs, seed, etc.)
+  params <- params[!names(params) %in% c(
+    "training_frame", "validation_frame", "nfolds", "seed", "model_id",
+    "response_column", "ignored_columns", "fold_assignment", "fold_column"
+  )]
+  
+  # Convert list to data frame (1 row per parameter)
+  tibble(
+    model_id = id,
+    model_family = family,
+    param_name = names(params),
+    param_value = sapply(params, function(x) paste0(collapse = ", ", x))
+  )
+})
+
+# Show summary
+hp_summary %>%
+  arrange(model_family, model_id, param_name) %>%
+  print(n = 20)
+
+# Keep only parameters that change across models
+hp_variable <- hp_summary %>%
+  group_by(param_name) %>%
+  filter(n_distinct(param_value) > 1) %>%
+  ungroup()
+
+# Sort for readability
+hp_variable %>%
+  arrange(model_family, model_id, param_name) %>%
+  print(n = 40)
+```
+
+pipeML
+```{r, eval = FALSE}
+library(pipeML)
+library(dplyr)
+library(caret)
+set.seed(1234)
+res <- compute_features.training.ML(features_train = df %>% dplyr::select(-R.NR), 
+                                    target_var = df$R.NR,
+                                    task_type = "classification",
+                                    trait.positive = "NR",
+                                    metric = "AUPRC",
+                                    stack = FALSE,
+                                    k_folds = 5,
+                                    n_rep = 1,
+                                    LODO = FALSE,
+                                    batch_id = NULL,
+                                    file_name = "Test",
+                                    ncores = 2,
+                                    return = TRUE)
+```
+
+Test in independent dataset
+```{r}
+clinical = read.delim("~/Documents/LungPredict_late_stage/Data/Captier/TIPIT_reponse_134.txt")
+
+# testing_set = compute.test.set(cell.groups$Processed_deconvolution, cell.groups$Cell_groups, names(cell.groups$Cell_groups[[2]]), deconv_test)
+testing_set = replicate_deconvolution_subgroups(cell.groups$Processed_deconvolution, deconv_test)
+## Preprocessing clinical data
+clinical = clinical %>%
+  dplyr::filter(OS_bin != "NA") %>%
+  dplyr::mutate(R.NR = factor(ifelse(.data$PFS >= 90, "R", "NR")))
+
+testing_set = testing_set[rownames(testing_set)%in%clinical$patient_ID,]
+```
+
+Evaluate with pipeML
+```{r, eval = FALSE}
+pred = pipeML::compute_prediction(model = res, 
+                                  test_data = testing_set, 
+                                  target_var = clinical$R.NR, 
+                                  trait.positive = "NR", 
+                                  file.name = "Test", 
+                                  maximize = "Accuracy", 
+                                  return = TRUE)
+
+get_curves(pred$Metrics, "Specificity", "Sensitivity", 
+           "Recall", "Precision", "model", 
+           pred[["AUC"]][["AUROC"]], pred[["AUC"]]$AUPRC, "Test")
+```
+
+Evaluate with H2O
+```{r, eval = FALSE}
+# ======================================================
+# 🧠 Evaluate the best model
+# ======================================================
+
+best_model <- aml@leader
+
+# Predict on test set
+testing_set = cbind(testing_set, R.NR = clinical$R.NR)
+testing_set <- as.h2o(testing_set)
+y <- "R.NR"
+
+pred <- h2o.predict(best_model, testing_set)
+
+# Compute performance metrics
+perf <- h2o.performance(best_model, newdata = testing_set)
+
+auc_value   <- h2o.auc(perf)
+auprc_value <- h2o.pr_auc(perf)
+
+cat("\n=== Model Performance ===\n")
+cat("AUC:    ", round(auc_value, 3), "\n")
+cat("AUPRC:  ", round(auprc_value, 3), "\n")
+
+# Confusion matrix
+cat("\nConfusion Matrix:\n")
+print(h2o.confusionMatrix(perf))
+
+# Extract ROC data (thresholds, TPR, FPR)
+roc_data <- as.data.frame(h2o.metric(perf))
+
+# Plot
+ggplot(roc_data, aes(x = fpr, y = tpr)) +
+  geom_line(color = "#2C7BB6", size = 1.2) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "gray50") +
+  labs(
+    title = paste0("ROC Curve (AUC = ", round(auc_value, 3), ")"),
+    x = "False Positive Rate (1 - Specificity)",
+    y = "True Positive Rate (Sensitivity)"
+  ) +
+  theme_minimal(base_size = 14)
+
+ggplot(roc_data, aes(x = recall, y = precision)) +
+  geom_line(color = "#D7191C", size = 1.2) +
+  geom_hline(yintercept = mean(as.vector(testing_set[[y]]) == "versicolor"), 
+             linetype = "dashed", color = "gray60") +
+  labs(
+    title = paste0("Precision–Recall Curve (AUPRC = ", round(auprc_value, 3), ")"),
+    x = "Recall (Sensitivity)",
+    y = "Precision (PPV)"
+  ) +
+  theme_minimal(base_size = 14)
+```
+Full benchmark
+```{r, eval = FALSE}
+# ============================================================
+# ⚙️ Load packages
+# ============================================================
+if (!requireNamespace("caret", quietly = TRUE)) install.packages("caret")
+if (!requireNamespace("pROC", quietly = TRUE)) install.packages("pROC")
+if (!requireNamespace("PRROC", quietly = TRUE)) install.packages("PRROC")
+
+library(caret)
+library(pROC)
+library(PRROC)
+
+set.seed(1234)
+
+n <- 1000
+p <- 20
+
+# True signal only in first 5 predictors, rest are noise
+X <- matrix(rnorm(n * p), n, p)
+colnames(X) <- paste0("x", 1:p)
+
+# Nonlinear, overlapping signal
+lin_pred <- 0.5 * X[,1] - 0.3 * X[,2]^2 + 0.6 * sin(X[,3]) - 0.4 * X[,4] + 0.2 * X[,5]
+prob <- 1 / (1 + exp(-lin_pred))
+y <- rbinom(n, 1, prob)
+
+df <- data.frame(X, y = factor(y, labels = c("no", "yes")))
+
+# Train/test split (80/20)
+set.seed(42)
+train_index <- createDataPartition(df$y, p = 0.8, list = FALSE)
+train_data <- df[train_index, ]
+test_data  <- df[-train_index, ]
+
+# ============================================================
+# 🤖 2. Define training control with 5-fold CV + AUC
+# ============================================================
+ctrl <- trainControl(
+  method = "cv",
+  number = 5,
+  classProbs = TRUE,
+  summaryFunction = twoClassSummary,  # computes AUC, Sensitivity, Specificity
+  savePredictions = "final"
+)
+
+# ============================================================
+# 🚀 3. Train a model (e.g., logistic regression)
+# ============================================================
+set.seed(42)
+model <- train(
+  y ~ .,
+  data = train_data,
+  method = "glmnet",
+  metric = "ROC",
+  trControl = ctrl,
+  tuneLength = 10
+)
+
+print(model)
+
+# ============================================================
+# 📊 4. Compute cross-validated AUC and AUPRC manually
+# ============================================================
+cv_preds <- model$pred
+cv_auc <- pROC::roc(cv_preds$obs, cv_preds$yes, levels = rev(levels(cv_preds$obs)))$auc
+
+# Use PRROC for AUPRC
+cv_pr <- PRROC::pr.curve(
+  scores.class0 = cv_preds$yes[cv_preds$obs == "yes"],
+  scores.class1 = cv_preds$yes[cv_preds$obs == "no"],
+  curve = TRUE
+)
+cv_auprc <- cv_pr$auc.integral
+
+cat("\n=== Cross-validated performance ===\n")
+cat("CV AUC:   ", round(cv_auc, 3), "\n")
+cat("CV AUPRC: ", round(cv_auprc, 3), "\n")
+
+# ============================================================
+# 🧠 5. Evaluate on independent test set
+# ============================================================
+test_pred <- predict(model, newdata = test_data, type = "prob")
+
+# Compute AUC
+test_auc <- pROC::roc(test_data$y, test_pred$yes, levels = rev(levels(test_data$y)))$auc
+
+# Compute AUPRC
+test_pr <- PRROC::pr.curve(
+  scores.class0 = test_pred$yes[test_data$y == "yes"],
+  scores.class1 = test_pred$yes[test_data$y == "no"],
+  curve = TRUE
+)
+test_auprc <- test_pr$auc.integral
+
+cat("\n=== Independent test set performance ===\n")
+cat("Test AUC:   ", round(test_auc, 3), "\n")
+cat("Test AUPRC: ", round(test_auprc, 3), "\n")
+
+# ============================================================
+# 📈 6. (Optional) Plot PR curve on test set
+# ============================================================
+plot(
+  test_pr$curve[, 1], test_pr$curve[, 2], type = "l", col = "red", lwd = 2,
+  xlab = "Recall", ylab = "Precision",
+  main = paste0("Precision-Recall Curve (AUPRC = ", round(test_auprc, 3), ")")
+)
+abline(h = mean(test_data$y == "yes"), lty = 2, col = "gray")
+```
+pipeML
+```{r, eval = FALSE}
+set.seed(42)
+res <- compute_features.training.ML(features_train = train_data %>% dplyr::select(-y), 
+                                    target_var = train_data$y,
+                                    task_type = "classification",
+                                    trait.positive = "yes",
+                                    metric = "AUPRC",
+                                    stack = FALSE,
+                                    k_folds = 5,
+                                    n_rep = 1,
+                                    LODO = FALSE,
+                                    batch_id = NULL,
+                                    file_name = "Test",
+                                    ncores = 2,
+                                    return = TRUE)
+
+pred = pipeML::compute_prediction(model = res, 
+                                  test_data = test_data, 
+                                  target_var = test_data$y, 
+                                  trait.positive = "yes", 
+                                  file.name = "Test", 
+                                  maximize = "Accuracy", 
+                                  return = TRUE)
+
+get_curves(pred$Metrics, "Specificity", "Sensitivity", 
+           "Recall", "Precision", "model", 
+           pred[["AUC"]][["AUROC"]], pred[["AUC"]]$AUPRC, "Test")
+```
+
+Benchmark with same ML models of pipeML and H2O
+
+```{r, eval = FALSE}
+# ================================================================
+# 📦 Load packages
+# ================================================================
+library(h2o)
+library(dplyr)
+library(ggplot2)
+
+# Initialize H2O cluster
+h2o.init(nthreads = -1, max_mem_size = "8G")
+
+# ================================================================
+# 🧩 Example dataset (more difficult binary classification)
+# ================================================================
+set.seed(123)
+# Convert to H2O frame
+df_h2o <- as.h2o(df)
+x <- setdiff(names(df), "R.NR")
+y <- "R.NR"
+df_h2o[, y] <- as.factor(df_h2o[, y])
+
+# ================================================================
+# ⚙️ Define models comparable to your caret ones
+# ================================================================
+models_to_run <- list(
+  RF     = function() h2o.randomForest(x = x, y = y, training_frame = df_h2o,
+                                       nfolds = 5, seed = 123, keep_cross_validation_predictions = TRUE),
+  GBM    = function() h2o.gbm(x = x, y = y, training_frame = df_h2o,
+                              nfolds = 5, seed = 123, keep_cross_validation_predictions = TRUE),
+  GLMNET = function() h2o.glm(x = x, y = y, training_frame = df_h2o,
+                              family = "binomial", alpha = 0.5, lambda_search = TRUE,
+                              nfolds = 5, seed = 123, keep_cross_validation_predictions = TRUE),
+  LASSO  = function() h2o.glm(x = x, y = y, training_frame = df_h2o,
+                              family = "binomial", alpha = 1, lambda_search = TRUE,
+                              nfolds = 5, seed = 123, keep_cross_validation_predictions = TRUE),
+  RIDGE  = function() h2o.glm(x = x, y = y, training_frame = df_h2o,
+                              family = "binomial", alpha = 0, lambda_search = TRUE,
+                              nfolds = 5, seed = 123, keep_cross_validation_predictions = TRUE),
+  XGBoost = function() h2o.xgboost(x = x, y = y, training_frame = df_h2o,
+                                   ntrees = 50, max_depth = 6, learn_rate = 0.1,
+                                   nfolds = 5, seed = 123, keep_cross_validation_predictions = TRUE),
+  SVM_linear = function() h2o.glm(x = x, y = y, training_frame = df_h2o,
+                                  family = "binomial", alpha = 0, lambda = 0,
+                                  nfolds = 5, seed = 123, solver = "IRLSM",
+                                  keep_cross_validation_predictions = TRUE),
+  SVM_radial = function() h2o.deeplearning(x = x, y = y, training_frame = df_h2o,
+                                           hidden = c(50, 50), epochs = 20,
+                                           nfolds = 5, seed = 123,
+                                           keep_cross_validation_predictions = TRUE)
+)
+
+# ================================================================
+# 🚀 Run all models and collect CV AUC / AUPRC
+# ================================================================
+results <- lapply(names(models_to_run), function(name) {
+  cat("\nTraining model:", name, "\n")
+  model <- tryCatch(models_to_run[[name]](), error = function(e) NULL)
+
+  if (!is.null(model)) {
+    cv_metrics <- model@model$cross_validation_metrics_summary
+    auc_mean   <- as.numeric(cv_metrics["auc", "mean"])
+    auc_sd     <- as.numeric(cv_metrics["auc", "sd"])
+    auprc_mean <- as.numeric(cv_metrics["pr_auc", "mean"])
+    auprc_sd   <- as.numeric(cv_metrics["pr_auc", "sd"])
+
+    data.frame(
+      Model = name,
+      AUC_mean = auc_mean, AUC_SD = auc_sd,
+      AUPRC_mean = auprc_mean, AUPRC_SD = auprc_sd
+    )
+  } else {
+    data.frame(Model = name, AUC_mean = NA, AUC_SD = NA, AUPRC_mean = NA, AUPRC_SD = NA)
+  }
+})
+
+results_df <- do.call(rbind, results)
+print(results_df)
+
+# ================================================================
+# 📊 Plot CV AUC and AUPRC
+# ================================================================
+results_long <- results_df %>%
+  tidyr::pivot_longer(cols = c(AUC_mean, AUPRC_mean),
+                      names_to = "Metric", values_to = "Score")
+
+ggplot(results_long, aes(x = reorder(Model, Score), y = Score, fill = Metric)) +
+  geom_col(position = position_dodge(width = 0.8)) +
+  coord_flip() +
+  theme_minimal(base_size = 14) +
+  labs(title = "Cross-Validated AUC & AUPRC across H2O Models",
+       x = "Model", y = "Score") +
+  geom_errorbar(aes(ymin = Score - ifelse(Metric == "AUC_mean", AUC_SD, AUPRC_SD),
+                    ymax = Score + ifelse(Metric == "AUC_mean", AUC_SD, AUPRC_SD)),
+                width = 0.2, position = position_dodge(width = 0.8))
+
+# ================================================================
+# 🧹 Optional cleanup
+# ================================================================
+# h2o.shutdown(prompt = FALSE)
+```
+
+pipeML
+```{r}
+library(pipeML)
+library(dplyr)
+library(caret)
+set.seed(123)
+res <- compute_features.training.ML(features_train = df %>% dplyr::select(-R.NR), 
+                                    target_var = df$R.NR,
+                                    task_type = "classification",
+                                    trait.positive = "NR",
+                                    metric = "AUPRC",
+                                    stack = FALSE,
+                                    k_folds = 5,
+                                    n_rep = 1,
+                                    LODO = FALSE,
+                                    batch_id = NULL,
+                                    file_name = "Test",
+                                    ncores = 2,
+                                    return = TRUE)
+
+res$AUROC_median
+res$AUPRC_median
+```
+
+H2o wrapper function
+```{r, eval = FALSE}
+#' Run H2O AutoML and Return Cross-Validation Metrics
+#'
+#' This function runs H2O AutoML on the provided dataset and
+#' returns CV-based performance metrics (AUC, AUPRC, Accuracy, LogLoss)
+#' for all models in the leaderboard.
+#'
+#' @param train_df Data frame with predictors and target variable.
+#' @param outcome_col Character string naming the binary target variable.
+#' @param nfolds Number of CV folds (default = 5).
+#' @param max_runtime_secs Max runtime in seconds for AutoML (default = 120).
+#' @param seed Random seed (default = 1234).
+#'
+#' @return A tibble with model IDs, family, AUC, AUPRC, Accuracy, LogLoss (CV mean & SD).
+#' @export
+#'
+run_h2o_benchmark <- function(train_df, outcome_col,
+                              nfolds = 5,
+                              max_runtime_secs = 120,
+                              seed = 1234) {
+  requireNamespace("h2o", quietly = TRUE)
+  requireNamespace("dplyr", quietly = TRUE)
+
+  # Initialize H2O if not running
+  if (!h2o::h2o.clusterIsUp()) {
+    h2o::h2o.init(nthreads = -1, max_mem_size = "8G")
+  }
+
+  # Prepare H2O frame
+  df_h2o <- h2o::as.h2o(train_df)
+  y <- outcome_col
+  x <- setdiff(names(train_df), y)
+  df_h2o[, y] <- as.factor(df_h2o[, y])
+
+  message("🚀 Running H2O AutoML benchmark...")
+
+  aml <- h2o::h2o.automl(
+    x = x,
+    y = y,
+    training_frame = df_h2o,
+    nfolds = nfolds,
+    max_runtime_secs = max_runtime_secs,
+    seed = seed,
+    keep_cross_validation_predictions = TRUE
+  )
+
+  lb <- as.data.frame(h2o::h2o.get_leaderboard(aml, extra_columns = "ALL"))
+  model_ids <- lb$model_id
+
+  message("✅ Extracting cross-validation metrics from models...")
+
+  results <- lapply(model_ids, function(id) {
+    model <- h2o::h2o.getModel(id)
+    perf <- model@model$cross_validation_metrics_summary
+
+    auc_mean <- as.numeric(perf["auc", "mean"])
+    auc_sd   <- as.numeric(perf["auc", "sd"])
+    auprc_mean <- as.numeric(perf["pr_auc", "mean"])
+    auprc_sd   <- as.numeric(perf["pr_auc", "sd"])
+    acc_mean <- as.numeric(perf["accuracy", "mean"])
+    acc_sd   <- as.numeric(perf["accuracy", "sd"])
+    logloss_mean <- as.numeric(perf["logloss", "mean"])
+    logloss_sd   <- as.numeric(perf["logloss", "sd"])
+
+    model_family <- model@algorithm
+
+    data.frame(
+      model_id = id,
+      model_family = model_family,
+      AUC_mean = auc_mean,  AUC_SD = auc_sd,
+      AUPRC_mean = auprc_mean, AUPRC_SD = auprc_sd,
+      Accuracy_mean = acc_mean, Accuracy_SD = acc_sd,
+      LogLoss_mean = logloss_mean, LogLoss_SD = logloss_sd,
+      stringsAsFactors = FALSE
+    )
+  })
+
+  results_df <- dplyr::bind_rows(results) %>%
+    dplyr::arrange(dplyr::desc(AUC_mean))
+
+  message("🏁 Benchmark complete! Returning summary table.")
+
+  return(results_df)
+}
+```
+
+Test wrapper function
+```{r, eval = FALSE}
+library(mlbench)
+data("Sonar", package = "mlbench")
+
+benchmark_results <- run_h2o_benchmark(Sonar, outcome_col = "Class",
+                                       nfolds = 5, max_runtime_secs = 90)
+
+print(benchmark_results)
+
+# Visualize top models
+library(ggplot2)
+top10 <- benchmark_results %>% 
+  dplyr::arrange(dplyr::desc(AUC_mean)) %>% 
+  dplyr::slice_head(n = 10)
+
+p = ggplot(top10, aes(x = reorder(model_id, AUC_mean), 
+                  y = AUC_mean, fill = model_family)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = AUC_mean - AUC_SD, ymax = AUC_mean + AUC_SD), 
+                width = 0.2) +
+  coord_flip() +
+  theme_minimal(base_size = 13) +
+  labs(
+    title = "Top 10 H2O AutoML Models (Cross-validated AUC)",
+    x = "Model ID", 
+    y = "AUC (mean ± SD)",
+    fill = "Model Family"
+  )
+
+p
+```
+
+H2O wrapper function
+```{r}
+run_h2o_fold <- function(train_df, test_df, outcome_col, 
+                         max_runtime_secs = 60, seed = 1234,
+                         nfolds_inner = 5, balance_classes = TRUE) {
+
+  # Safe init
+  tryCatch({ h2o::h2o.init(nthreads = -1) }, error = function(e) {
+    h2o::h2o.init(nthreads = -1)
+  })
+
+  # Convert to H2O frames
+  train_h2o <- as.h2o(train_df)
+  test_h2o  <- as.h2o(test_df)
+
+  x <- setdiff(names(train_df), outcome_col)
+  y <- outcome_col
+  train_h2o[, y] <- as.factor(train_h2o[, y])
+  test_h2o[, y]  <- as.factor(test_h2o[, y])
+
+  # -------------------------------
+  # AutoML for the INNER CV
+  # -------------------------------
+  aml <- h2o.automl(
+    x = x,
+    y = y,
+    training_frame = train_h2o,
+    nfolds = nfolds_inner,
+    max_runtime_secs = max_runtime_secs,
+    balance_classes = balance_classes,
+    seed = seed,
+    keep_cross_validation_predictions = TRUE,
+    keep_cross_validation_models = TRUE
+  )
+
+  # -------------------------------
+  # Extract ALL MODEL CV METRICS
+  # -------------------------------
+  lb <- h2o.get_leaderboard(aml, extra_columns = "ALL")
+
+  model_ids <- as.data.frame(lb$model_id)[,1]
+
+  all_cv_metrics <- lapply(model_ids, function(mid) {
+    m <- h2o.getModel(mid)
+    perf <- m@model$cross_validation_metrics_summary
+
+    data.frame(
+      model_id = mid,
+      AUC      = as.numeric(perf["auc", "mean"]),
+      AUPRC    = as.numeric(perf["pr_auc", "mean"]),
+      logloss  = as.numeric(perf["logloss", "mean"])
+    )
+  })
+
+  all_cv_metrics <- do.call(rbind, all_cv_metrics)
+
+  # -------------------------------
+  # Evaluate OUTER TEST FOLD
+  # -------------------------------
+  best_model <- aml@leader
+  perf_outer <- h2o.performance(best_model, newdata = test_h2o)
+
+  outer_auc   <- as.numeric(h2o.auc(perf_outer))
+  outer_auprc <- as.numeric(h2o.pr_auc(perf_outer))
+
+  list(
+    inner_cv_metrics = all_cv_metrics,    # AUC across all models
+    best_model_id    = best_model@model_id,
+    outer_auc        = outer_auc,
+    outer_auprc      = outer_auprc
+  )
+}
+```
+
+```{r}
+run_h2o_fold <- function(train_df, test_df, outcome_col, 
+                         max_runtime_secs = 60, seed = 1234,
+                         nfolds_inner = 5, balance_classes = TRUE) {
+
+  # Ensure H2O is running
+  tryCatch({ h2o::h2o.init(nthreads = -1) }, 
+           error = function(e) h2o::h2o.init(nthreads = -1))
+
+  # Convert to H2O
+  train_h2o <- as.h2o(train_df)
+  test_h2o  <- as.h2o(test_df)
+
+  x <- setdiff(names(train_df), outcome_col)
+  y <- outcome_col
+  train_h2o[, y] <- as.factor(train_h2o[, y])
+  test_h2o[, y]  <- as.factor(test_h2o[, y])
+
+  # ========================================
+  # Run AutoML
+  # ========================================
+  aml <- h2o.automl(
+    x = x,
+    y = y,
+    training_frame = train_h2o,
+    nfolds = nfolds_inner,
+    max_runtime_secs = max_runtime_secs,
+    balance_classes = balance_classes,
+    seed = seed,
+    keep_cross_validation_predictions = TRUE,
+    keep_cross_validation_models = TRUE
+  )
+
+  # ========================================
+  # Extract leaderboard
+  # ========================================
+  lb <- h2o.get_leaderboard(aml, extra_columns = "ALL")
+
+  model_ids <- as.data.frame(lb$model_id)[,1]
+
+  # Extract family using model_id string
+  model_families <- sub("_.*", "", model_ids)
+
+  # ========================================
+  # Extract CV metrics for ALL models
+  # ========================================
+  all_cv_metrics <- lapply(seq_along(model_ids), function(i) {
+    mid <- model_ids[i]
+    fam <- model_families[i]
+
+    m <- h2o.getModel(mid)
+    perf <- m@model$cross_validation_metrics_summary
+
+    data.frame(
+      model_id     = mid,
+      model_family = fam,
+      AUC          = as.numeric(perf["auc", "mean"]),
+      AUPRC        = as.numeric(perf["pr_auc", "mean"]),
+      logloss      = as.numeric(perf["logloss", "mean"])
+    )
+  })
+
+  all_cv_metrics <- do.call(rbind, all_cv_metrics)
+
+  # ========================================
+  # Evaluate OUTER fold performance 
+  # ========================================
+  best_model <- aml@leader
+  perf_outer <- h2o.performance(best_model, newdata = test_h2o)
+
+  outer_auc   <- as.numeric(h2o.auc(perf_outer))
+  outer_auprc <- as.numeric(h2o.pr_auc(perf_outer))
+
+  list(
+    inner_cv_metrics = all_cv_metrics,
+    best_model_id    = best_model@model_id,
+    outer_auc        = outer_auc,
+    outer_auprc      = outer_auprc
+  )
+}
+```
+
+Outer CV loop
+```{r}
+library(caret)
+library(dplyr)
+library(ggplot2)
+library(mlbench)
+library(h2o)
+
+data("Sonar")
+df <- Sonar
+outcome_col <- "Class"
+
+set.seed(42)
+folds <- caret::createMultiFolds(df[[outcome_col]], k = 3, times = 1)
+
+all_results <- list()
+plot_list <- list()
+counter <- 1
+
+for (fold_name in names(folds)) {
+
+  train_idx <- folds[[fold_name]]
+  test_idx  <- setdiff(seq_len(nrow(df)), train_idx)
+
+  train_df <- df[train_idx, ]
+  test_df  <- df[test_idx, ]
+
+  # Remove near-zero variance (train only)
+  nzv <- caret::nearZeroVar(train_df[, -ncol(train_df)])
+  if (length(nzv) > 0) {
+    train_df <- train_df[, -nzv, drop = FALSE]
+    test_df <- test_df[, names(train_df), drop = FALSE]
+  }
+
+  cat("Running outer fold:", fold_name, "\n")
+
+  res <- run_h2o_fold(train_df, test_df, outcome_col, nfolds_inner = 5,
+                      max_runtime_secs = 20)
+
+  # Store results
+  all_results[[counter]] <- res
+
+  # -------------------------
+  # 🔥 Plot AUC across ALL MODELS (inner CV leaderboard)
+  # -------------------------
+  p <- ggplot(res$inner_cv_metrics,
+              aes(x = reorder(model_id, AUC), y = AUC)) +
+    geom_col(fill = "steelblue") +
+    coord_flip() +
+    ggtitle(paste("Inner CV AUC across H2O models - Fold:", fold_name)) +
+    xlab("Model ID") + ylab("AUC")
+
+  print(p)   # display plot
+  plot_list[[counter]] <- p
+
+  counter <- counter + 1
+}
+```
+
+Aggregate results
+```{r}
+all_inner <- lapply(all_results, function(x) x$inner_cv_metrics)
+
+# Bind into a single data frame (may contain repeated model_ids per fold)
+inner_df <- dplyr::bind_rows(all_inner, .id = "fold")
+
+# Aggregate by model family
+agg_family <- inner_df %>%
+  group_by(model_family) %>%
+  summarise(
+    median_AUC   = median(AUC, na.rm = TRUE),
+    mad_AUC      = mad(AUC, na.rm = TRUE),
+    median_AUPRC = median(AUPRC, na.rm = TRUE),
+    mad_AUPRC    = mad(AUPRC, na.rm = TRUE),
+    n_models     = n()
+  ) %>%
+  arrange(desc(median_AUC))
+```
+
