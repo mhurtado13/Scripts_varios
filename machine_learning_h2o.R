@@ -190,7 +190,7 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     #plot_metric_summary(fam_summary, metric = "auc", statistic = "median")
     #best_info <- pick_best_model_outer(fam_summary)
     custom_output <- do.call(fold_construction_fun,
-                             c(list(data = train_data, bestune = result[[best_param]][["params"]]), fold_construction_args_fixed))
+                             c(list(data = train_data, bestune = result[[nested_result$best_parameter]][["params"]]), fold_construction_args_fixed))
     
     output = list(nested_result, custom_output)
   }
