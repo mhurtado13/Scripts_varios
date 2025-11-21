@@ -150,13 +150,15 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     
     # Initialize master list to store everything in memory
     models_all_folds <- vector("list", length(result_files))
+    predictions_all_folds = list()
     
     for (fold_i in seq_along(result_files)) {
       
       result = readRDS(result_files[[fold_i]])
       
       models_all_params <- vector("list", length(result))
-      
+      all_oof_params = list()
+      result = result[1:5]
       for (parameter_i in seq_along(result)) {
         
         train_df <- result[[parameter_i]][["train_data"]]
@@ -165,15 +167,15 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
         test_df = cbind(test_df, target = result[[parameter_i]][["obs_test"]])
         
         res <- run_h2o_fold(train_df, test_df, "target", 
-                            nfolds_inner = 5, max_runtime_secs = 120)
+                            nfolds_inner = 0, max_runtime_secs = 60)
         
         # Store results
         models_all_params[[parameter_i]] <- res
-        
+        all_oof_params[[parameter_i]] <- res$oof_predictions
       }
       
       models_all_folds[[fold_i]] <- models_all_params
-
+      predictions_all_folds[[fold_i]] <- all_oof_params
     }
     
     nested_result <- select_best_model_nested(models_all_folds)
@@ -204,9 +206,18 @@ run_h2o_fold <- function(train_df, test_df, outcome_col,
                          max_runtime_secs = 60, seed = 1234,
                          nfolds_inner = 5, balance_classes = TRUE) {
   
+  #port <- get_free_h2o_port()
+  
   # Ensure H2O is running
-  tryCatch({ h2o::h2o.init(nthreads = -1) }, 
-           error = function(e) h2o::h2o.init(nthreads = -1))
+  h2o::h2o.init(
+    nthreads = -1,
+    bind_to_localhost = TRUE
+  )
+  
+  on.exit({
+    h2o::h2o.shutdown(prompt = FALSE)
+    Sys.sleep(3)
+  }, add = TRUE)
   
   # Convert to H2O frames
   train_h2o <- as.h2o(train_df)
@@ -237,66 +248,85 @@ run_h2o_fold <- function(train_df, test_df, outcome_col,
   # 2) Extract leaderboard (all models)
   # ======================================================
   lb <- h2o.get_leaderboard(aml, extra_columns = "ALL")
-  model_ids <- as.data.frame(lb$model_id)[,1]
-  model_families <- sub("_.*", "", model_ids)
   
   # ======================================================
   # 3) Collect INNER CV metrics per model
   # ======================================================
-  inner_cv <- lapply(seq_along(model_ids), function(i) {
+  if(nfolds_inner > 1){
+    model_ids <- as.data.frame(lb$model_id)[,1]
+    model_families <- sub("_.*", "", model_ids)
     
-    mid <- model_ids[i]
-    fam <- model_families[i]
-    
-    m <- h2o.getModel(mid)
-    perf <- m@model$cross_validation_metrics_summary
-    
-    # Convert perf to a clean dataframe
-    df <- data.frame(
-      metric = rownames(perf),
-      mean   = perf[, "mean"],
-      sd     = perf[, "sd"],
-      row.names = NULL
-    )
-    
-    # Remove GLM-only metrics
-    df <- df %>% 
-      dplyr::filter(!metric %in% c("null_deviance", "residual_deviance")) %>%
-      dplyr::mutate(sd_name = paste0(metric, "_sd"))
-    
-    # Reshape to wide format: mean columns + sd columns
-    df_mean <- df %>%
-      select(metric, mean) %>%
-      tidyr::pivot_wider(names_from = metric, values_from = mean)
-    
-    df_sd <- df %>%
-      select(sd_name, sd) %>%
-      tidyr::pivot_wider(names_from = sd_name, values_from = sd)
-    
-    df_wide <- dplyr::bind_cols(df_mean, df_sd)
-    
-    # Combine mean + sd metrics
-    df_wide <- dplyr::bind_cols(
-      data.frame(
-        model_id = mid,
-        family   = fam,
-        stringsAsFactors = FALSE
-      ),
+    inner_cv <- lapply(seq_along(model_ids), function(i) {
+      
+      mid <- model_ids[i]
+      fam <- model_families[i]
+      
+      m <- h2o.getModel(mid)
+      perf <- m@model$cross_validation_metrics_summary
+      
+      # Convert perf to a clean dataframe
+      df <- data.frame(
+        metric = rownames(perf),
+        mean   = perf[, "mean"],
+        sd     = perf[, "sd"],
+        row.names = NULL
+      )
+      
+      # Remove GLM-only metrics
+      df <- df %>% 
+        dplyr::filter(!metric %in% c("null_deviance", "residual_deviance")) %>%
+        dplyr::mutate(sd_name = paste0(metric, "_sd"))
+      
+      # Reshape to wide format: mean columns + sd columns
+      df_mean <- df %>%
+        select(metric, mean) %>%
+        tidyr::pivot_wider(names_from = metric, values_from = mean)
+      
+      df_sd <- df %>%
+        select(sd_name, sd) %>%
+        tidyr::pivot_wider(names_from = sd_name, values_from = sd)
+      
+      df_wide <- dplyr::bind_cols(df_mean, df_sd)
+      
+      # Combine mean + sd metrics
+      df_wide <- dplyr::bind_cols(
+        data.frame(
+          model_id = mid,
+          family   = fam,
+          stringsAsFactors = FALSE
+        ),
+        df_wide
+      )
+      
       df_wide
-    )
+    })
     
-    df_wide
-  })
-  
-  inner_cv <- dplyr::bind_rows(inner_cv) 
-  
-  # ======================================================
-  # 4) For each FAMILY → pick best model_id by INNER CV AUC
-  # ======================================================
-  best_per_family <- inner_cv %>%
-    group_by(family) %>%
-    slice_max(auc, n = 1, with_ties = FALSE) %>%
-    ungroup()
+    inner_cv <- dplyr::bind_rows(inner_cv) 
+    
+    # ======================================================
+    # 4) For each FAMILY → pick best model_id by INNER CV AUC
+    # ======================================================
+    best_per_family <- inner_cv %>%
+      group_by(family) %>%
+      slice_max(auc, n = 1, with_ties = FALSE) %>%
+      ungroup()
+    
+  }else{ # nfolds_inner == 0 NO inner CV
+    
+    inner_cv <- NULL   # no inner CV metrics possible
+    
+    lb <- as.data.frame(lb)   # convert to R dataframe
+    
+    # in this mode, the “best per family” is ambiguous,
+    # so we select the *leader* of each family
+    best_per_family <- lb %>%
+      mutate(family = sub("_.*", "", model_id)) %>%
+      group_by(family) %>%
+      slice(1) %>%  # first ranked model in LB for that family
+      ungroup() %>%
+      select(model_id, family)
+    
+  }
   
   # ======================================================
   # 5) Evaluate *each family’s best model* on the OUTER test set
@@ -328,11 +358,21 @@ run_h2o_fold <- function(train_df, test_df, outcome_col,
   
   outer_eval <- dplyr::bind_rows(outer_eval)
   
+  ### Return out-fold predictions
+  preds <- list()
+  
+  for (mid in best_per_family$model_id) {
+    model <- h2o.getModel(mid)
+    p <- as.data.frame(h2o.predict(model, test_h2o))[ ,3]  # probability for class 1
+    preds[[mid]] <- p
+  }
+  
   # Return ALL families performance for this fold
   list(
     inner_cv_metrics   = inner_cv,
     best_models_family = best_per_family,
-    outer_family_perf  = outer_eval
+    outer_family_perf  = outer_eval,
+    oof_predictions = preds
   )
 }
 
@@ -862,3 +902,18 @@ select_best_model_nested <- function(all_results) {
   )
 }
 
+get_free_h2o_port <- function(min = 15000, max = 60000) {
+  repeat {
+    p <- sample(min:max, 1)
+    
+    ok <- try({
+      # H2O needs p and p+1 FREE
+      con1 <- socketConnection("127.0.0.1", port = p,     open = "r+", server = TRUE)
+      con2 <- socketConnection("127.0.0.1", port = p + 1, open = "r+", server = TRUE)
+      close(con1); close(con2)
+      TRUE
+    }, silent = TRUE)
+    
+    if (identical(ok, TRUE)) return(p)
+  }
+}
