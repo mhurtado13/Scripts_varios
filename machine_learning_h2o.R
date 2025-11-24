@@ -150,15 +150,14 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
     
     # Initialize master list to store everything in memory
     models_all_folds <- vector("list", length(result_files))
-    predictions_all_folds = list()
+    test_predictions_all_folds = list()
     
     for (fold_i in seq_along(result_files)) {
       
       result = readRDS(result_files[[fold_i]])
       
       models_all_params <- vector("list", length(result))
-      all_oof_params = list()
-      result = result[1:5]
+      test_predictions_all_params = list()
       for (parameter_i in seq_along(result)) {
         
         train_df <- result[[parameter_i]][["train_data"]]
@@ -171,28 +170,27 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
         
         # Store results
         models_all_params[[parameter_i]] <- res
-        all_oof_params[[parameter_i]] <- res$oof_predictions
+        test_predictions_all_params[[parameter_i]] <- res$test_predictions
       }
       
       models_all_folds[[fold_i]] <- models_all_params
-      predictions_all_folds[[fold_i]] <- all_oof_params
+      test_predictions_all_folds[[fold_i]] <- test_predictions_all_params
     }
     
-    nested_result <- select_best_model_nested(models_all_folds)
-    
+    nested_result <- select_best_parameter_family_model(models_all_folds, result_files, test_predictions_all_folds)
+
     grDevices::pdf(paste0("Results/AUROC_CV_", file_name, ".pdf"), width = 10)
-    plot_metric_summary_nested(nested_result, metric = "auc", statistic = "median")
+    plot_metric_summary(nested_result, metric = "auc", statistic = "median")
     dev.off()
     
     grDevices::pdf(paste0("Results/AUPRC_CV_", file_name, ".pdf"), width = 10)
-    plot_metric_summary_nested(nested_result, metric = "auprc", statistic = "median")
+    plot_metric_summary(nested_result, metric = "auprc", statistic = "median")
     dev.off()
-    
-    #fam_summary <- aggregate_nested_families(models_all_folds)
-    #plot_metric_summary(fam_summary, metric = "auc", statistic = "median")
-    #best_info <- pick_best_model_outer(fam_summary)
+
+    h2o::h2o.init(nthreads = -1, bind_to_localhost = TRUE)
     custom_output <- do.call(fold_construction_fun,
                              c(list(data = train_data, bestune = result[[nested_result$best_parameter]][["params"]]), fold_construction_args_fixed))
+    h2o::h2o.shutdown(prompt = FALSE)
     
     output = list(nested_result, custom_output)
   }
@@ -204,11 +202,11 @@ compute_k_fold_CV = function(model, k_folds, n_rep, stacking = FALSE, metric = "
 
 run_h2o_fold <- function(train_df, test_df, outcome_col, 
                          max_runtime_secs = 60, seed = 1234,
-                         nfolds_inner = 5, balance_classes = TRUE) {
+                         nfolds_inner = 0, balance_classes = TRUE) {
   
-  #port <- get_free_h2o_port()
+  train_preds <- list()
+  test_preds  <- list()
   
-  # Ensure H2O is running
   h2o::h2o.init(
     nthreads = -1,
     bind_to_localhost = TRUE
@@ -219,7 +217,6 @@ run_h2o_fold <- function(train_df, test_df, outcome_col,
     Sys.sleep(3)
   }, add = TRUE)
   
-  # Convert to H2O frames
   train_h2o <- as.h2o(train_df)
   test_h2o  <- as.h2o(test_df)
   
@@ -229,9 +226,6 @@ run_h2o_fold <- function(train_df, test_df, outcome_col,
   train_h2o[, y] <- as.factor(train_h2o[, y])
   test_h2o[,  y] <- as.factor(test_h2o[, y])
   
-  # ======================================================
-  # 1) Run AutoML (inner CV)
-  # ======================================================
   aml <- h2o.automl(
     x = x,
     y = y,
@@ -240,97 +234,38 @@ run_h2o_fold <- function(train_df, test_df, outcome_col,
     max_runtime_secs = max_runtime_secs,
     balance_classes = balance_classes,
     seed = seed,
-    keep_cross_validation_predictions = TRUE,
-    keep_cross_validation_models = TRUE
+    keep_cross_validation_predictions = (nfolds_inner > 1),
+    keep_cross_validation_models = (nfolds_inner > 1)
   )
   
-  # ======================================================
-  # 2) Extract leaderboard (all models)
-  # ======================================================
   lb <- h2o.get_leaderboard(aml, extra_columns = "ALL")
+  lb <- as.data.frame(lb)
   
-  # ======================================================
-  # 3) Collect INNER CV metrics per model
-  # ======================================================
-  if(nfolds_inner > 1){
-    model_ids <- as.data.frame(lb$model_id)[,1]
-    model_families <- sub("_.*", "", model_ids)
-    
-    inner_cv <- lapply(seq_along(model_ids), function(i) {
-      
-      mid <- model_ids[i]
-      fam <- model_families[i]
-      
-      m <- h2o.getModel(mid)
-      perf <- m@model$cross_validation_metrics_summary
-      
-      # Convert perf to a clean dataframe
-      df <- data.frame(
-        metric = rownames(perf),
-        mean   = perf[, "mean"],
-        sd     = perf[, "sd"],
-        row.names = NULL
-      )
-      
-      # Remove GLM-only metrics
-      df <- df %>% 
-        dplyr::filter(!metric %in% c("null_deviance", "residual_deviance")) %>%
-        dplyr::mutate(sd_name = paste0(metric, "_sd"))
-      
-      # Reshape to wide format: mean columns + sd columns
-      df_mean <- df %>%
-        select(metric, mean) %>%
-        tidyr::pivot_wider(names_from = metric, values_from = mean)
-      
-      df_sd <- df %>%
-        select(sd_name, sd) %>%
-        tidyr::pivot_wider(names_from = sd_name, values_from = sd)
-      
-      df_wide <- dplyr::bind_cols(df_mean, df_sd)
-      
-      # Combine mean + sd metrics
-      df_wide <- dplyr::bind_cols(
-        data.frame(
-          model_id = mid,
-          family   = fam,
-          stringsAsFactors = FALSE
-        ),
-        df_wide
-      )
-      
-      df_wide
-    })
-    
-    inner_cv <- dplyr::bind_rows(inner_cv) 
-    
-    # ======================================================
-    # 4) For each FAMILY → pick best model_id by INNER CV AUC
-    # ======================================================
-    best_per_family <- inner_cv %>%
-      group_by(family) %>%
-      slice_max(auc, n = 1, with_ties = FALSE) %>%
-      ungroup()
-    
-  }else{ # nfolds_inner == 0 NO inner CV
-    
-    inner_cv <- NULL   # no inner CV metrics possible
-    
-    lb <- as.data.frame(lb)   # convert to R dataframe
-    
-    # in this mode, the “best per family” is ambiguous,
-    # so we select the *leader* of each family
-    best_per_family <- lb %>%
-      mutate(family = sub("_.*", "", model_id)) %>%
-      group_by(family) %>%
-      slice(1) %>%  # first ranked model in LB for that family
-      ungroup() %>%
-      select(model_id, family)
-    
+  best_per_family <- lb %>%
+    mutate(family = sub("_.*", "", model_id)) %>%
+    group_by(family) %>%
+    slice(1) %>%
+    ungroup() %>%
+    select(model_id, family)
+  
+  # -------- Save each best model per family --------
+  dir.create("Results/ML_models", recursive = TRUE, showWarnings = FALSE)
+  for (i in seq_len(nrow(best_per_family))) {
+    model <- h2o.getModel(best_per_family$model_id[i])
+    h2o.saveModel(model, path = "Results/ML_models", force = TRUE)
   }
   
-  # ======================================================
-  # 5) Evaluate *each family’s best model* on the OUTER test set
-  # ======================================================
+  # ----------- TEST predictions (meta-testing features) ----------
+  for (i in seq_len(nrow(best_per_family))) {
+    mid  <- best_per_family$model_id[i]
+    fam  <- best_per_family$family[i]
+    model <- h2o.getModel(mid)
+    
+    pred_test <- as.data.frame(h2o.predict(model, test_h2o))[ , 3]
+    test_preds[[fam]] <- pred_test
+  }
+  
+  # ----------- OUTER METRICS ------------
   outer_eval <- lapply(seq_len(nrow(best_per_family)), function(i) {
     mid <- best_per_family$model_id[i]
     fam <- best_per_family$family[i]
@@ -338,42 +273,23 @@ run_h2o_fold <- function(train_df, test_df, outcome_col,
     model <- h2o.getModel(mid)
     perf  <- h2o.performance(model, newdata = test_h2o)
     
-    auc_val      <- as.numeric(h2o.auc(perf))
-    auprc_val    <- as.numeric(h2o.aucpr(perf))
-    logloss_val  <- as.numeric(h2o.logloss(perf))
-    mse_val      <- as.numeric(h2o.mse(perf))
-    rmse_val     <- as.numeric(h2o.rmse(perf))
-    
     data.frame(
       model_id = mid,
       family   = fam,
-      auc     = auc_val,
-      auprc   = auprc_val,
-      logloss = logloss_val,
-      mse     = mse_val,
-      rmse    = rmse_val
+      auc      = as.numeric(h2o.auc(perf)),
+      auprc    = as.numeric(h2o.aucpr(perf)),
+      logloss  = as.numeric(h2o.logloss(perf)),
+      mse      = as.numeric(h2o.mse(perf)),
+      rmse     = as.numeric(h2o.rmse(perf))
     )
-    
   })
   
   outer_eval <- dplyr::bind_rows(outer_eval)
   
-  ### Return out-fold predictions
-  preds <- list()
-  
-  for (mid in best_per_family$model_id) {
-    model <- h2o.getModel(mid)
-    p <- as.data.frame(h2o.predict(model, test_h2o))[ ,3]  # probability for class 1
-    preds[[mid]] <- p
-  }
-  
-  # Return ALL families performance for this fold
-  list(
-    inner_cv_metrics   = inner_cv,
-    best_models_family = best_per_family,
+  return(list(
     outer_family_perf  = outer_eval,
-    oof_predictions = preds
-  )
+    test_predictions   = test_preds     # <-- used to evaluate meta-learner
+  ))
 }
 
 aggregate_families <- function(all_results) {
@@ -468,40 +384,34 @@ aggregate_families <- function(all_results) {
   )
 }
 
-plot_metric_summary_nested <- function(nested_obj, metric = "auc", statistic = "median") {
+plot_metric_summary <- function(nested_obj, metric = "auc", statistic = "median") {
   
-  # ---------- Determine expected names ----------
-  metric_col  <- paste0(metric, "_", statistic)
-  sd_col      <- paste0(metric, "_sd")
+  # Expected column names such as "auc_median", "auc_sd"
+  metric_col <- paste0(metric, "_", statistic)
+  sd_col     <- paste0(metric, "_sd")
   
-  # ---------- INNER ----------
-  has_inner <- metric_col %in% colnames(nested_obj$inner_family_summary)
+  # -------------------------------------------------------------
+  #   Only OUTER summary exists now → nested_obj$family_summary
+  # -------------------------------------------------------------
+  df_outer <- nested_obj$family_summary
   
-  df_inner <- NULL
-  if (has_inner) {
-    df_inner <- nested_obj$inner_family_summary %>%
-      select(family, value = all_of(metric_col), sd = all_of(sd_col)) %>%
-      mutate(type = "CV training")
+  # Validate required columns
+  if (!metric_col %in% colnames(df_outer) || !sd_col %in% colnames(df_outer)) {
+    stop("Metric ", metric, " not found in nested_obj$family_summary.")
   }
   
-  # ---------- OUTER ----------
-  has_outer <- metric_col %in% colnames(nested_obj$outer_family_summary)
+  # Prepare DF for plotting
+  df <- df_outer %>%
+    dplyr::select(
+      family,
+      value = dplyr::all_of(metric_col),
+      sd    = dplyr::all_of(sd_col)
+    ) %>%
+    dplyr::mutate(type = "Performance")
   
-  df_outer <- NULL
-  if (has_outer) {
-    df_outer <- nested_obj$outer_family_summary %>%
-      select(family, value = all_of(metric_col), sd = all_of(sd_col)) %>%
-      mutate(type = "CV test")
-  }
-  
-  if (!has_inner & !has_outer) {
-    stop("Metric ", metric, " not found in nested summaries.")
-  }
-  
-  # ---------- Combine ----------
-  df <- dplyr::bind_rows(df_inner, df_outer)
-  
-  # ---------- Plot ----------
+  # -------------------------------------------------------------
+  #   Plot
+  # -------------------------------------------------------------
   print(
     ggplot(df, aes(x = family, y = value, fill = type)) +
       geom_col(position = position_dodge(width = 0.8)) +
@@ -514,17 +424,15 @@ plot_metric_summary_nested <- function(nested_obj, metric = "auc", statistic = "
         breaks = seq(0, 1, by = 0.1),
         limits = c(0, 1)
       ) +
-      scale_fill_manual(values = c(
-        "CV training" = "#1f77b4",
-        "CV test"     = "#ff7f0e"
-      )) +
-      ggtitle(paste("Nested CV performance –", toupper(metric), statistic)) +
-      xlab("Family") +
+      scale_fill_manual(values = c("Performance" = "#1f77b4")) +
+      ggtitle(paste0("Performance by ML models family - ", metric_col)) +
+      xlab("ML model family") +
       ylab(metric) +
       theme_minimal(base_size = 14) +
       theme(
         axis.text.x = element_text(angle = 45, hjust = 1),
-        panel.grid.minor = element_blank()
+        panel.grid.minor = element_blank(),
+        legend.position = "none"
       )
   )
 }
@@ -672,12 +580,10 @@ aggregate_nested_families <- function(all_results) {
 aggregate_by_parameter <- function(all_results) {
   
   outer_list <- list()
-  inner_list <- list()
   
   # ============================================================
-  # 1) Collect ALL inner + outer metrics across folds × params
+  # 1) Collect OUTER metrics across folds × params
   # ============================================================
-  
   for (fold in seq_along(all_results)) {
     for (param in seq_along(all_results[[fold]])) {
       
@@ -689,17 +595,12 @@ aggregate_by_parameter <- function(all_results) {
       df_outer$parameter <- param
       outer_list[[length(outer_list) + 1]] <- df_outer
       
-      ## ---- INNER ----
-      df_inner <- res$inner_cv_metrics
-      df_inner$fold      <- fold
-      df_inner$parameter <- param
-      inner_list[[length(inner_list) + 1]] <- df_inner
+      ## ---- NO INNER CV ----
+      ## nfolds_inner = 0 → inner_cv_metrics = NULL
     }
   }
   
   outer_df <- dplyr::bind_rows(outer_list)
-  inner_df <- dplyr::bind_rows(inner_list)
-  
   
   # ============================================================
   # 2) Summary per PARAMETER — OUTER METRICS
@@ -727,63 +628,41 @@ aggregate_by_parameter <- function(all_results) {
       rmse_mean   = mean(rmse, na.rm = TRUE),
       rmse_median = median(rmse, na.rm = TRUE),
       rmse_sd     = sd(rmse, na.rm = TRUE),
-      
-      n = n(),
+
       .groups = "drop"
     ) %>%
     arrange(desc(auc_median))
   
-  
   # ============================================================
-  # 3) Summary per PARAMETER — INNER CV METRICS
-  #    (excluding *_sd columns)
+  # 3) Return only outer summaries
   # ============================================================
-  
-  # Identify metrics to aggregate (ignore sd, ids, fold, parameter)
-  metric_cols_inner <- names(inner_df)
-  metric_cols_inner <- metric_cols_inner[
-    !(metric_cols_inner %in% c("model_id", "family", "fold", "parameter")) &
-      !stringr::str_detect(metric_cols_inner, "_sd$")
-  ]
-  
-  inner_summary <- inner_df %>%
-    group_by(parameter) %>%
-    summarise(
-      across(
-        all_of(metric_cols_inner),
-        list(
-          mean   = ~mean(.x, na.rm = TRUE),
-          median = ~median(.x, na.rm = TRUE),
-          sd     = ~sd(.x, na.rm = TRUE)
-        ),
-        .names = "{.col}_{.fn}"
-      ),
-      n = n(),
-      .groups = "drop"
-    ) %>%
-    arrange(desc(auc_median))
-  
-  
-  # ============================================================
-  # 4) Return all aggregated components
-  # ============================================================
-  
   return(list(
     outer_per_fold = outer_df,
-    outer_summary  = outer_summary,
-    inner_per_fold = inner_df,
-    inner_summary  = inner_summary
+    outer_summary  = outer_summary
   ))
 }
 
-select_best_model_nested <- function(all_results) {
+
+select_best_parameter_family_model <- function(models, result_files, test_predictions_all_folds) {
   
-  message("==== Selecting Best Parameter → Best Family → Best Model ID ====\n")
+  ############################################## Aggregate by parameter
+  param_aggr <- aggregate_by_parameter(models)
   
-  # ================================================================
-  # (1) Aggregate by parameter → choose BEST PARAMETER
-  # ================================================================
-  param_aggr <- aggregate_by_parameter(all_results)
+  ############################################## Ensemble stacking models
+  
+  test_preds <- extract_predictions_all_params(test_predictions_all_folds) ## Extract predictions from base models
+   
+  stack_res <- build_stacking_matrices_all_params(test_preds, result_files) ## Build stacking matrices across params
+  
+  stacking_outer <- train_and_evaluate_meta_learner_all_params( ## Train and test metalearners
+    stacking_df_list = stack_res,
+    families = names(test_preds[[1]][[1]])
+  )
+  
+  param_aggr$outer_summary = rbind(param_aggr$outer_summary, stacking_outer$outer_summary)  ## Join CV results with base models
+  param_aggr$outer_per_fold = rbind(param_aggr$outer_per_fold, stacking_outer$outer_per_fold) ## Join CV results with base models
+  
+  ############################################## Choose best parameter
   
   param_summary <- param_aggr$outer_summary
   
@@ -792,22 +671,11 @@ select_best_model_nested <- function(all_results) {
     slice(1) %>%
     pull(parameter)
   
-  message("👉 Best PARAMETER: ", best_param, "\n")
-  
-  
-  # ================================================================
-  # (2) Subset OUTER & INNER (per-fold) for the best parameter ONLY
-  # ================================================================
+  ############################################## Aggregate OUTER metrics by FAMILY
+
   outer_df_best_param <- param_aggr$outer_per_fold %>%
     filter(parameter == best_param)
   
-  inner_df_best_param <- param_aggr$inner_per_fold %>%
-    filter(parameter == best_param)
-  
-  
-  # ================================================================
-  # (3) Aggregate OUTER metrics by FAMILY (best parameter only)
-  # ================================================================
   outer_family_summary <- outer_df_best_param %>%
     group_by(family) %>%
     summarise(
@@ -837,40 +705,9 @@ select_best_model_nested <- function(all_results) {
     arrange(desc(auc_median))
   
   best_family <- outer_family_summary$family[1]
-  message("👉 Best FAMILY for this parameter: ", best_family, "\n")
   
-  
-  # ================================================================
-  # (4) Aggregate INNER CV metrics by FAMILY (best parameter only)
-  # ================================================================
-  # Identify NON-SD inner metric columns
-  inner_metric_cols <- names(inner_df_best_param)
-  inner_metric_cols <- inner_metric_cols[
-    !(inner_metric_cols %in% c("model_id", "family", "fold", "parameter")) &
-      !stringr::str_detect(inner_metric_cols, "_sd$")
-  ]
-  
-  inner_family_summary <- inner_df_best_param %>%
-    group_by(family) %>%
-    summarise(
-      across(
-        all_of(inner_metric_cols),
-        list(
-          mean   = ~mean(.x, na.rm = TRUE),
-          median = ~median(.x, na.rm = TRUE),
-          sd     = ~sd(.x, na.rm = TRUE)
-        ),
-        .names = "{.col}_{.fn}"
-      ),
-      n_models = n(),
-      .groups = "drop"
-    ) %>%
-    arrange(desc(auc_median))
-  
-  
-  # ================================================================
-  # (5) Select Best MODEL ID inside best family & parameter
-  # ================================================================
+  ############################################## Select Best MODEL ID inside best family
+
   best_model_row <- outer_df_best_param %>%
     filter(family == best_family) %>%
     arrange(desc(auc)) %>%
@@ -878,29 +715,25 @@ select_best_model_nested <- function(all_results) {
   
   best_model_id <- best_model_row$model_id
   
-  message("👉 Best MODEL ID: ", best_model_id, "\n")
   message("============================================================\n")
   
+  message("==== Selecting Best Parameter → Best Family → Best Model ID ====\n")
+  message("Best PARAMETER: ", best_param, "\n")
+  message("Best FAMILY for this parameter: ", best_family, "\n")
+  message("Best MODEL ID: ", best_model_id, "\n")
   
-  # ================================================================
-  # (6) Return everything
-  # ================================================================
-  list(
+  return(list(
     best_parameter = best_param,
-    best_family = best_family,
-    best_model_id = best_model_id,
+    best_family    = best_family,
+    best_model_id  = best_model_id,
     
-    parameter_summary = param_summary,
+    parameter_summary  = param_summary,
+    family_summary = outer_family_summary,
     
-    outer_family_summary = outer_family_summary,
-    inner_family_summary = inner_family_summary,
-    
-    outer_df_best_param = outer_df_best_param,
-    inner_df_best_param = inner_df_best_param,
-    
-    best_model_row = best_model_row
-  )
+    per_fold_results_best_param = outer_df_best_param
+  ))
 }
+
 
 get_free_h2o_port <- function(min = 15000, max = 60000) {
   repeat {
@@ -916,4 +749,288 @@ get_free_h2o_port <- function(min = 15000, max = 60000) {
     
     if (identical(ok, TRUE)) return(p)
   }
+}
+
+extract_predictions_all_params <- function(predictions_all_folds) {
+  
+  # Helper: extract model family from a model_id
+  extract_family <- function(name) sub("_.*", "", name)
+  
+  out <- vector("list", length(predictions_all_folds))
+  
+  for (fold_i in seq_along(predictions_all_folds)) {
+    
+    fold_pred_list <- predictions_all_folds[[fold_i]]
+    n_params <- length(fold_pred_list)
+    
+    # Store predictions per parameter
+    param_list <- vector("list", n_params)
+    
+    for (param_i in seq_len(n_params)) {
+      
+      preds_param <- fold_pred_list[[param_i]]
+      
+      # Convert model IDs to families
+      new_names <- sapply(names(preds_param), extract_family)
+      names(preds_param) <- new_names
+      
+      # Store
+      param_list[[param_i]] <- preds_param
+    }
+    
+    out[[fold_i]] <- param_list
+  }
+  
+  return(out)
+}
+
+
+
+build_stacking_matrices_all_params <- function(preds_all_params, result_files) {
+  
+  K <- length(preds_all_params)                      # number of folds
+  P <- length(preds_all_params[[1]])                 # number of parameters
+  
+  out <- vector("list", P)
+  
+  for (param_i in seq_len(P)) {
+    
+    stacking_rows <- list()
+    
+    # Get consistent family names (from first fold)
+    families <- names(preds_all_params[[1]][[param_i]])
+    
+    # Loop over folds
+    for (fold_i in seq_len(K)) {
+      
+      preds_fold_param <- preds_all_params[[fold_i]][[param_i]]
+      
+      # Ensure consistent ordering
+      pred_mat <- sapply(families, function(f) preds_fold_param[[f]])
+      colnames(pred_mat) <- families
+      
+      # Extract correct target for this fold + param
+      result <- readRDS(result_files[[fold_i]])
+      target <- result[[param_i]][["obs_test"]]
+      
+      # Build DF
+      df_fold <- data.frame(
+        fold = fold_i,
+        pred_mat,
+        target = target,
+        row.names = NULL
+      )
+      
+      stacking_rows[[fold_i]] <- df_fold
+    }
+    
+    # Bind all folds
+    out[[param_i]] <- dplyr::bind_rows(stacking_rows)
+  }
+  
+  return(out)  # list of stacking_df per parameter
+}
+
+train_meta_learner <- function(stacking_df, families) {
+  
+  # Start a fresh H2O cluster
+  h2o.init(
+    nthreads = -1,
+    bind_to_localhost = TRUE
+  )
+  
+  # Ensure clean shutdown when finished
+  on.exit({
+    h2o::h2o.shutdown(prompt = FALSE)
+    Sys.sleep(2)
+  }, add = TRUE)
+  
+  # Convert to H2O
+  df_h2o <- as.h2o(stacking_df)
+  
+  x <- families
+  y <- "target"
+  
+  # Ensure target is categorical
+  df_h2o[, y] <- as.factor(df_h2o[, y])
+  
+  # Train meta-learner (GLM0 = simple logistic regression)
+  meta_model <- h2o.glm(
+    x = x,
+    y = y,
+    training_frame = df_h2o,
+    family = "binomial",
+    lambda = 0,
+    alpha = 0
+  )
+  
+  return(meta_model)
+}
+
+evaluate_meta_learner <- function(meta_model, preds_best, result_files, best_param) {
+  
+  h2o::h2o.init(
+    nthreads = -1,
+    bind_to_localhost = TRUE
+  )
+  
+  on.exit({
+    h2o::h2o.shutdown(prompt = FALSE)
+    Sys.sleep(3)
+  }, add = TRUE)
+  
+  # ------ Collect ALL OOF predictions & labels ------
+  all_pred_rows <- list()
+  all_true_rows <- list()
+  
+  for (fold_i in seq_along(preds_best)) {
+    
+    preds_fold <- preds_best[[fold_i]]
+    families   <- names(preds_fold)
+    
+    # prediction matrix for this fold
+    pred_mat <- sapply(families, function(f) preds_fold[[f]])
+    all_pred_rows[[fold_i]] <- as.data.frame(pred_mat)
+    
+    # true labels for this fold
+    result <- readRDS(result_files[[fold_i]])
+    true_y <- result[[best_param]]$obs_test
+    
+    all_true_rows[[fold_i]] <- data.frame(y = true_y)
+  }
+  
+  # ---- Bind ALL folds together (OOF dataset) ----
+  pred_df <- do.call(rbind, all_pred_rows)
+  true_df <- do.call(rbind, all_true_rows)
+  colnames(true_df) <- 'target'
+  
+  # Convert to H2O
+  pred_h2o <- as.h2o(pred_df)
+  true_h2o <- as.h2o(true_df)
+  
+  # ------------------------------------------------
+  # **Single evaluation on ALL OOF data**
+  # ------------------------------------------------
+  perf <- h2o.performance(
+    meta_model,
+    newdata = h2o.cbind(pred_h2o, true_h2o)
+  )
+  
+  # ---- Return AutoML-style summary row ----
+  data.frame(
+    model_id = "STACK_META_LEARNER",
+    family   = "Stacking",
+    auc      = as.numeric(h2o.auc(perf)),
+    auprc    = as.numeric(h2o.aucpr(perf)),
+    logloss  = as.numeric(h2o.logloss(perf)),
+    mse      = as.numeric(h2o.mse(perf)),
+    rmse     = as.numeric(h2o.rmse(perf)),
+    parameter = best_param
+  )
+}
+
+train_and_evaluate_meta_learner_all_params <- function(stacking_df_list, families){
+  
+  h2o.init(nthreads = -1, bind_to_localhost = TRUE)
+  on.exit({ h2o.shutdown(prompt = FALSE); Sys.sleep(2) }, add = TRUE)
+  
+  P <- length(stacking_df_list)  # number of parameters
+  
+  outer_per_fold  <- list()
+  outer_summary   <- list()
+  
+  # Create folder for saving metalearners
+  save_dir <- "Results/ML_models"
+  dir.create(save_dir, recursive = TRUE, showWarnings = FALSE)
+  
+  #====================================================================
+  #   LOOP OVER PARAMETERS
+  #====================================================================
+  for (param_i in seq_len(P)) {
+    
+    stacking_df <- stacking_df_list[[param_i]]
+    K <- length(unique(stacking_df$fold))
+    
+    fold_results <- list()
+    
+    #---------------------------------------------------------
+    #    1) TRAIN/TEST META-LEARNER FOR EACH FOLD
+    #---------------------------------------------------------
+    for (fold_i in seq_len(K)) {
+      
+      # ---- TRAIN (fold != i) ----
+      train_df  <- stacking_df[stacking_df$fold != fold_i, ]
+      train_h2o <- as.h2o(train_df)
+      train_h2o[, "target"] <- as.factor(train_h2o[, "target"])
+      
+      meta_model <- h2o.glm(
+        x = families,
+        y = "target",
+        training_frame = train_h2o,
+        family = "binomial",
+        lambda = 0,
+        alpha = 0
+      )
+      
+      # ---- SAVE METALERNER MODEL ----
+      save_name <- paste0("StackedEnsemble_param_", param_i, "_fold", fold_i)
+      h2o.saveModel(meta_model, path = save_dir, force = TRUE, filename = save_name)
+      
+      # ---- TEST (fold == i) ----
+      test_df  <- stacking_df[stacking_df$fold == fold_i, ]
+      test_h2o <- as.h2o(test_df)
+      
+      perf <- h2o.performance(meta_model, newdata = test_h2o)
+      
+      fold_results[[fold_i]] <- data.frame(
+        model_id  = save_name,
+        family    = "StackedEnsemble",
+        auc       = as.numeric(h2o.auc(perf)),
+        auprc     = as.numeric(h2o.aucpr(perf)),
+        logloss   = as.numeric(h2o.logloss(perf)),
+        mse       = as.numeric(h2o.mse(perf)),
+        rmse      = as.numeric(h2o.rmse(perf)),
+        fold      = fold_i,
+        parameter = param_i
+      )
+    }
+    
+    # Combine into a single DF for this parameter
+    df_param <- dplyr::bind_rows(fold_results)
+    outer_per_fold[[param_i]] <- df_param
+    
+    #---------------------------------------------------------
+    #    2) SUMMARY (matches nested_result$outer_family_summary)
+    #---------------------------------------------------------
+    outer_summary[[param_i]] <- df_param %>%
+      summarise(
+        parameter     = param_i,
+        
+        auc_mean      = mean(auc, na.rm = TRUE),
+        auc_median    = median(auc, na.rm = TRUE),
+        auc_sd        = sd(auc, na.rm = TRUE),
+        
+        auprc_mean    = mean(auprc, na.rm = TRUE),
+        auprc_median  = median(auprc, na.rm = TRUE),
+        auprc_sd      = sd(auprc, na.rm = TRUE),
+        
+        logloss_mean   = mean(logloss, na.rm = TRUE),
+        logloss_median = median(logloss, na.rm = TRUE),
+        logloss_sd     = sd(logloss, na.rm = TRUE),
+        
+        mse_mean       = mean(mse, na.rm = TRUE),
+        mse_median     = median(mse, na.rm = TRUE),
+        mse_sd         = sd(mse, na.rm = TRUE),
+        
+        rmse_mean      = mean(rmse, na.rm = TRUE),
+        rmse_median    = median(rmse, na.rm = TRUE),
+        rmse_sd        = sd(rmse, na.rm = TRUE)
+        
+      )
+  }
+  
+  return(list(
+    outer_per_fold = dplyr::bind_rows(outer_per_fold),
+    outer_summary  = dplyr::bind_rows(outer_summary)
+  ))
 }
