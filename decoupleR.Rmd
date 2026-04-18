@@ -1,0 +1,113 @@
+---
+title: "decoupleR"
+author: "Marcelo Hurtado"
+date: "2026-03-18"
+output: html_document
+---
+
+```{r}
+library(decoupleR)
+
+# Extra libraries
+library(dplyr)
+library(pheatmap)
+```
+
+```{r}
+data <- decoupleR::get_toy_data()
+
+mat <- data$mat
+head(mat,5)[,1:5]
+
+network <- data$network
+network
+```
+```{r}
+decoupleR::show_methods()
+```
+
+```{r}
+res_gsea <- decoupleR::run_fgsea(mat = mat, 
+                                 network = network, 
+                                 .source = 'source', 
+                                 .target = 'target', 
+                                 nproc = 1, 
+                                 minsize = 0)
+
+res_gsea
+```
+
+```{r}
+# Transform to matrix
+mat_gsea <- res_gsea %>%
+            dplyr::filter(statistic == 'fgsea') %>%
+            decoupleR::pivot_wider_profile(id_cols = source, 
+                                           names_from = condition, 
+                                           values_from = score) %>%
+            as.matrix()
+```
+
+Run consensus
+```{r}
+res_decouple <- decoupleR::decouple(mat, 
+                                    network, 
+                                    .source ='source', 
+                                    .target ='target',
+                                    minsize = 0)
+
+res_decouple
+
+# Transform to matrix
+mat_consensus <- res_decouple %>%
+                 dplyr::filter(statistic == 'consensus') %>%
+                 decoupleR::pivot_wider_profile(id_cols = source, 
+                                                names_from = condition, 
+                                                values_from = score) %>%
+                 as.matrix()
+```
+
+Check database
+```{r}
+library(OmnipathR)
+
+uniprot_kinases <- OmnipathR::import_omnipath_annotations(resources = "UniProt_keyword") %>%
+  dplyr::filter(value == "Kinase" & !grepl("COMPLEX", uniprot)) %>%
+  distinct() %>%
+  pull(genesymbol) %>%
+  unique()
+
+OmnipathR::annotation_resources()
+
+omnipath_ptm <- OmnipathR::get_signed_ptms() %>%
+  dplyr::filter(modification %in% c("dephosphorylation","phosphorylation")) %>%
+  dplyr::filter(!(stringr::str_detect(sources, "ProtMapper") & n_resources == 1)) %>%
+  dplyr::mutate(p_site = paste0(substrate_genesymbol, "_", residue_type, residue_offset),
+                mor = ifelse(modification == "phosphorylation", 1, -1)) %>%
+  dplyr::transmute(p_site, enzyme_genesymbol, mor) %>%
+  dplyr::filter(enzyme_genesymbol %in% uniprot_kinases)
+
+omnipath_ptm$likelihood <- 1
+
+#we remove ambiguous modes of regulations
+omnipath_ptm$id <- paste(omnipath_ptm$p_site,omnipath_ptm$enzyme_genesymbol, sep ="")
+omnipath_ptm <- omnipath_ptm[!duplicated(omnipath_ptm$id),]
+omnipath_ptm <- omnipath_ptm[,-5]
+```
+
+```{r}
+library(OmnipathR)
+omnipath_show_db()
+import_omnipath_interactions()
+```
+
+```{r}
+up_gs <- get_db('up_gs')
+up_gs
+```
+
+```{r}
+cc_network = OmnipathR::import_intercell_network(high_confidence = TRUE)
+```
+
+
+

@@ -1,0 +1,56 @@
+---
+title: "CARNIVAL"
+date: "2026-03-18"
+output: html_document
+---
+
+Tutorial from: https://saezlab.github.io/CARNIVAL/articles/CARNIVAL.html
+
+```{r}
+library(CARNIVAL)
+```
+
+```{r}
+library(CARNIVAL)
+load(file = system.file("toy_perturbations_ex1.RData",
+                        package = "CARNIVAL"))
+load(file = system.file("toy_measurements_ex1.RData",
+                        package = "CARNIVAL"))
+load(file = system.file("toy_network_ex1.RData",
+                        package = "CARNIVAL"))
+
+carnivalOptions <- defaultLpSolveCarnivalOptions()
+
+# Output dir
+dir.create("ToyExample1", showWarnings = FALSE)
+carnivalOptions$outputFolder <- "ToyExample1"
+
+# lpSolve
+resultsLpSolve <- runVanillaCarnival( perturbations = toy_perturbations_ex1, 
+                                      measurements = toy_measurements_ex1,
+                                      priorKnowledgeNetwork = toy_network_ex1, 
+                                      carnivalOptions = carnivalOptions)
+```
+
+```{r}
+load(file = system.file("toy_measurements_ex2.RData",
+                        package="CARNIVAL"))
+load(file = system.file("toy_network_ex2.RData",
+                        package="CARNIVAL"))
+
+carnivalOptions <- defaultLpSolveCarnivalOptions()
+
+# Output dir
+dir.create("ToyExample2", showWarnings = FALSE)
+carnivalOptions$outputFolder <- "ToyExample2"
+
+# lpSolve
+toy_network_ex2 <- as.data.frame(toy_network_ex2)
+colnames(toy_network_ex2) <- c("source", "interaction", "target")
+toy_measurements_ex2 <- c("M1" = 1, "M2" = 1, "M3" = 1)
+
+inverseCarnivalResults <- runInverseCarnival( measurements = c(toy_measurements_ex2), 
+                                              priorKnowledgeNetwork = toy_network_ex2, 
+                                              carnivalOptions = carnivalOptions)
+```
+

@@ -1,0 +1,185 @@
+---
+title: "PHiC_CpGs_analysis"
+author: "Marcelo Hurtado"
+date: "2026-02-22"
+output: html_document
+---
+
+This script integrates DNA methylation data with PCHi-C interactions to identify genes with methylated promoters and genes whose promoters interact with methylated distal regions, generating gene sets for adding into RNAseq signatures.
+
+Load libraries
+```{r}
+library(chaser)
+library(dplyr)
+source("functions.R")
+```
+
+Load EPIC manifest to map CpGs with chromosome regions
+```{r}
+load("../output/Manifest_EPIC_CpGs_chr.RData")
+```
+
+Load differential CpGs
+```{r}
+load("../data/DNAMethSignature/DNAMethSignature/all_CPGs_for_pairwise.RData")
+list_cpg = FitList1[["Activated_Macrophage-B_cell"]]$ID
+## Subset to only differential CpGs
+cpg = manifest %>%
+  dplyr::filter(CPGs %in% list_cpg)
+```
+
+Prepare CpG feature table from PCHi-C network
+```{r}
+cpgsel <- data.frame(
+  chr   = cpg[,2],
+  start = cpg[,3],
+  end   = cpg[,4],
+  value = 1 # Value = 1 means this genomic region contains a CpG belonging to the methylation signature.
+)
+
+# Why cpgsel is needed?
+
+# Chaser:
+# - Overlaps your CpG intervals with PCHi-C fragments
+# - For each fragment, sums the value
+# - Stores that number inside the network object
+# 
+# So after loading features:
+# - If a fragment overlaps 3 CpGs → it gets value = 3
+# - If it overlaps 0 CpGs → it gets value = 0
+```
+
+Builds a promoter–enhancer interaction network and annotates it with methylation information.
+```{r}
+load("../data/pchic.RData") #PCHi-C data: each row corresponds to one chromatin interaction: |bait(promoter)|other end (distal fragment)|
+
+# Add chr prefix
+pchic[,1] <- paste0('chr', pchic[,1]) #formatting consistency
+pchic[,6] <- paste0('chr', pchic[,6]) #formatting consistency
+
+bp_forchaser <- pchic[, c(1,2,3,6,7,8)] # Promoter coordinates  →  Distal coordinates
+
+# Build chromatin network
+netbp <- chaser::make_chromnet(bp_forchaser) # Each unique genomic fragment becomes a node / Each interaction becomes an edge
+netbp <- chaser::load_features(netbp, cpgsel, type = 'features_table', missingv = 0) #Add methylation features to network
+
+# What happens in load_features():
+# - cpgsel contains CpG genomic coordinates.
+# - chaser overlaps CpGs with PCHi-C fragments.
+# For each fragment:
+# - If overlaps CpG → value added
+# - If no overlap → value = 0
+# So now every node has a feature:
+# - Fragment A → 2 CpGs
+# - Fragment B → 0 CpGs
+# - Fragment C → 1 CpG
+```
+
+Identify CpG-Containing Fragments
+```{r}
+netbpfeat <- chaser::export(netbp) #matrix with rows as fragments in the PCHi-C network (nodes) and value of CpGs overlapping that fragment
+cpgnodes  <- rownames(netbpfeat)[netbpfeat > 0] #select CpG-containing nodes
+```
+
+Identify Promoters and Other Ends
+```{r}
+edges  <- chaser::export(netbp, "edges") #data frame of all interactions in the chromatin network
+
+baits  <- unique(edges$node_from) #all fragments that act as promoters (nodes that initiate interactions)
+oes    <- setdiff(unique(edges$node_to), baits) #all fragments that act as Other Ends (distal regions) excluding promoters
+
+promcpg <- intersect(cpgnodes, baits) #promoters that contain at least one CpG
+oecpg   <- intersect(cpgnodes, oes) #distal fragments that contain at least one CpG
+
+### Summary:
+# promcpg → directly methylated promoters
+# oecpg → distal methylated fragments that may regulate promoters via chromatin looping
+```
+
+Promoter fragments and associated genes
+```{r}
+# Combines chromosome, start, and end coordinates into a single string.
+pchic$fragmentID <- paste0(
+  pchic$baitChr, ":",
+  pchic$baitStart, "-",
+  pchic$baitEnd
+)
+
+# Keep unique promoter fragments
+bait_annotation <- unique( #unique() ensures that each fragmentID appears only once, even if it interacts with multiple distal fragments
+  pchic[, c("fragmentID", "baitName")] # "baitName" contains gene names linked to each promoter fragment (multiple genes separated by ;)
+) 
+
+# Set rownames as fragment IDs
+rownames(bait_annotation) <- bait_annotation$fragmentID
+```
+
+Genes with Methylated Promoters
+```{r}
+# Extract gene symbol
+prom_genes_raw <- bait_annotation[promcpg, "baitName"]
+
+# Split multiple IDs and clean
+prom_genes <- unique(unlist(strsplit(prom_genes_raw, ";")))
+
+write.table(prom_genes, '../output/promoter_CpGs_SYMBOL.txt', quote = FALSE, row.names = FALSE, col.names = FALSE)
+```
+
+Genes Whose Promoters Interact with Methylated Distal Regions
+```{r}
+# Convert to igraph
+G <- igraph::graph_from_data_frame(
+  edges[, c("node_from", "node_to")],
+  directed = FALSE
+)
+
+# Find promoters interacting with methylated distal fragments
+neighs <- unique(unlist(lapply(oecpg, function(x) { #oecpg = distal fragments that contain methylated CpGs.
+  neighbors(G, x)$name #for each methylated distal fragment, get all connected promoter fragments
+})))
+
+# neighs = all promoter fragment IDs that interact with methylated distal fragments.
+
+# Extract gene symbol
+neigh_genes_raw <- bait_annotation[neighs, "baitName"]
+
+# Split multiple IDs and clean
+neigh_genes <- unique(unlist(strsplit(neigh_genes_raw, ";")))
+
+write.table(neigh_genes, '../output/oe_CpGs_SYMBOL.txt', quote = FALSE, row.names = FALSE, col.names = FALSE)
+```
+
+Load CpGs
+```{r}
+prom_genes = read.table("../output/promoter_CpGs_SYMBOL.txt")$V1
+neigh_genes = read.table("../output/oe_CpGs_SYMBOL.txt")$V1
+```
+
+Merge methylation-informed genes into RNA signature
+```{r}
+rna_signature = read.delim2("~/Documents/multideconv/inst/signatures/BPRNACan.txt")
+rna_genes = rna_signature$Genes
+
+# Identify genes overlapping with RNA signature
+overlap_prom <- intersect(prom_genes, rna_genes)   # promoter-methylated genes already in RNA signature
+overlap_neigh <- intersect(neigh_genes, rna_genes)    # distal-interacting genes already in RNA signature
+
+# Create expanded RNA signature:
+# - Combine original RNA signature with genes from methylation signature not already in RNA signature
+expanded_signature <- unique(c(rna_genes, prom_genes, neigh_genes))
+```
+
+Expand RNA signature with CpG signature
+```{r}
+source("functions.R")
+load("../output/CpG2genes.RData")
+load("../data/BLUEPRINT/BP_WGBS.RData")
+x = read.delim("~/Documents/multideconv/inst/signatures/BPRNACan.txt", row.names = 1)
+x_expanded = compute_CpG_extension(x, Final.Tumor.sig, cpg_gene_map)
+```
+
+Add original TCGA data
+```{r}
+load("../data/TCGA_RNAseq_cancer/")
+```
+

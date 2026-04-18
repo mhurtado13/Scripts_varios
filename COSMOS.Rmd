@@ -1,0 +1,336 @@
+---
+title: "COSMOS-tutorial"
+author: "A. Dugourd, A. Gabor and K. Zirngibl"
+date: "11/10/2020"
+output:
+  html_document
+vignette: >
+  %\VignetteIndexEntry{cosmosR tutorial}
+  %\VignetteEncoding{UTF-8}
+  %\VignetteEngine{knitr::rmarkdown}
+---
+  
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Installation and dependency
+
+COSMOS is dependent on CARNIVAL for exhibiting the signalling pathway optimisation.
+CARNIVAL requires the interactive version of IBM Cplex or CBC-COIN solver as the network optimiser. The IBM ILOG Cplex is freely available through Academic Initiative [here](https://www.ibm.com/products/ilog-cplex-optimization-studio).  The [CBC](https://projects.coin-or.org/Cbc) solver is open source and freely available for any user, but has a significantly lower performance than CPLEX. Obtain CBC executable directly usable for cosmos [here](https://ampl.com/products/solvers/open-source/#cbc).
+Alternatively for small networks, users can rely on the freely available [lpSolve R-package](https://cran.r-project.org/web/packages/lpSolve/index.html), which is automatically installed with the package.
+
+
+
+In this tutorial we use lpSolve, but we strongly recommend to obtain a license
+for CPLEX.
+
+```{r eval=FALSE}
+# install from bioconductor
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+BiocManager::install("cosmosR")
+
+
+# install the newest (development) version from GitHub
+# install.packages("remotes")
+# install CARNIVAL from github 
+remotes::install_github("saezlab/CARNIVAL")
+remotes::install_github("saezlab/cosmosR")
+```
+
+## Introduction
+
+COSMOS (Causal Oriented Search of Multi-Omic Space) is a method that integrates phosphoproteomics, transcriptomics, and metabolomics data sets. COSMOS leverages extensive prior knowledge of signaling pathways, metabolic networks, and gene regulation with computational methods to estimate activities of transcription factors and kinases as well as network-level causal reasoning. This pipeline can provide mechanistic explanations for experimental observations across multiple omic data sets.
+
+![data_intro_figure](../man/figures/intro_data.png)
+
+Essentially, COSMOS has 3 main components:
+
+* The prior knowledge: The goal of COSMOS is essentially to connect various deregulation events together with mechanistic hypotheses. Those mechanistic hypotheses are basically known potential interactions between molecular biology features, such as proteins and metabolites. An example of such interaction can be the activation of MTOR by AKT, in the EGFR canonical pathway. Thousands of such potential interaction can be assembled together to form a large network of interactions. Such networks are thus called prior knowledge networks (PKN), because they summarize large amounts of prior knowledge in the form of a network. In the context of COSMOS this interactions come from the Omnipath database, STICHdb and the recon3D reaction network. With respect to the example interaction between MTOR and AKT, the question that is usually asked when presented with a given experimental context is: while MTOR can activate AKT in general, is this interaction relevant in my experimental context? This brings us to the second component of COSMOS.
+
+* The data: Information about deregulated transcription factors (TF), kinases/phosphophatases and metabolites can be extracted from transcriptomic, phospho-proteomic or metabolomic data respectively, using footprint analysis methods (see:https://github.com/saezlab/transcriptutorial (Especially chapter 4)). Such information can be quite useful by itself, to characterize which TFs or kinases are specifically deregulated in cancer cells for example. the goal of COSMOS is to find how these different deregulation events can be connected together. Going back to the example of MTOR and AKT, if I know that AKT can potentially activate MTOR, and  I observe in my data that both AKT and MTOR are significantly activated in cancer tissue compared to their healthy counterpart, there is a reasonable chance that this interaction is active in the cancer tissue I'm studying. The problem is that data often contain information about hundreds of up and down-regulated activities at the same time, and thousands of potential interactions can potentially explain them. In order to find the optimal set of interactions that are relevant to explain the deregulation observed in my data, an algorithm is needed.
+
+* The algorithm: The problem described in the data part is formulated as an integer linear optimisation problem. The PKN and the data can be abstracted as a large set of integer variables operating together in an even larger set of equations (see https://www.nature.com/articles/s41540-019-0118-z for more info). Given a set of fixed value for the variable (that is, a subset of the known deregulation), we need to find the values for the other sets of variable (corresponding to proteins and metabolites for which we have no information in our data) that can lead to a satisfying result. A satisfying results in the context of COSMOS represent a sub-network of interactions that is as small as possible while coherently explaining as many of our known deregulation as possible. Thus, the set of equation mentioned earlier needs to be solved, using an integer linear programming solver. The solvers that are currently available for COSMOS are lpsolve, cbc and cplex. In general, CPLEX is preferred over CBC for most real case applications, while lpsolve is mainly used for testing with small networks and sets of measurements.
+
+![Summary figure](../man/figures/summary.png)
+
+## Tutorial section: signaling to metabolism
+
+First, we load the package
+
+```{r, warning=FALSE, message=FALSE}
+library(cosmosR)
+```
+
+In this part, we can set up the options for the CARNIVAL run, such as timelimit and min gap tolerance.
+
+The user should provide a path to its CPLEX/cbc executable.
+
+You can check the CARNIVAL_options variable to see all possible options that can be adjusted
+
+In this example, we will use the built-in solver lpSolve. User should be aware that lpSolve should ONLY be used for TESTS. To obtain meaningful results, best solver is cplex, or cbc if not possible.
+
+```{r, warning=FALSE, message=FALSE}
+CARNIVAL_options <- default_CARNIVAL_options(solver = "lpSolve")
+
+# To use CBC
+# CARNIVAL_options <- default_CARNIVAL_options(solver = "cbc")
+# CARNIVAL_options$solverPath <- "~/Documents/cbc"
+# CARNIVAL_options$threads <- 2
+# CARNIVAL_options$mipGAP <- 0.05
+
+# To use CPLEX:
+# CARNIVAL_options <- default_CARNIVAL_options(solver = "cplex")
+# CARNIVAL_options$solverPath <- "C:/Program Files/CPLEX_solver/cplex/bin/x64_win64/cplex.exe"
+# CARNIVAL_options$threads <- 2
+# CARNIVAL_options$mipGAP <- 0.05
+
+
+CARNIVAL_options$timelimit <- 3600
+
+```
+
+In the next section, we prepare the input to run cosmosR.
+The signaling inputs are the result of footprint based TF and kinase activity estimation.
+For more info on TF activity estimation from transcriptomic data, see:https://github.com/saezlab/transcriptutorial (Especially chapter 4)
+
+Here we use of toy PKN, to see the full meta PKN, you can load it with data(meta_network). To see how is the meta_PKN assembled, see: https://github.com/saezlab/meta_PKN_BIGG.git
+
+The metabolites in the prior knowledge network are identified as XMetab__HMDBid_compartment or XMetab__BIGGid_compartment
+(for example “Metab__HMDB0000190_c”). The compartment code is the BIGG model standard (r, c, e, x, m, l, n, g). 
+Thus we will first need to map whatever identifier for metabolite the data has to the one of the network.
+Genes are identified as gene symboles (in the signaling part of network) or Gene####__symbole (in the reaction network part of network).
+
+The maximum network depth will define the maximum number of step downstream of kinase/TF COSMOS will look for deregulated metabolites. Good first guess for max depth could be around between 4 and 6 (here it is 15 for the toy dataset)
+
+The differential experession data is used to filter out wrong TF-target interactions in this context after a pre-optimisation.
+
+The list of genes in the differential expression data will also be used as a reference to define which genes are expressed or not (all genes in the diff_expression_data are considered expressed, and genes that are no in diff_expression_data are removed from the network).
+
+Here, the CARNIVAL_options$timelimit is set for the pre-optimisation. Indeed, if the "filter_tf_gene_interaction_by_optimization" parameter of the "preprocess_COSMOS_signaling_to_metabolism" function is set to TRUE, COSMOS can perform a first optimisation run in order to generate a preliminary solution network that can be used for filtering out incoherences between TF activities and downstream target expressions.
+
+```{r, warning=FALSE, message=FALSE}
+data(toy_network)
+data(toy_signaling_input)
+data(toy_metabolic_input)
+data(toy_RNA)
+test_for <- preprocess_COSMOS_signaling_to_metabolism(meta_network = toy_network,
+                                                      signaling_data = toy_signaling_input,
+                                                      metabolic_data = toy_metabolic_input,
+                                                      diff_expression_data = toy_RNA,
+                                                      maximum_network_depth = 15,
+                                                      remove_unexpressed_nodes = TRUE,
+                                                      CARNIVAL_options = CARNIVAL_options)
+```
+
+In this part, we can set up the options for the actual run, such as timelimit and min gap tolerance.
+
+The running time should be much higher here than in pre-optimisation. You can increase the number of threads to use if you have many available CPUs.
+
+```{r, warning=FALSE, message=FALSE}
+CARNIVAL_options$timelimit <- 14400
+CARNIVAL_options$mipGAP <- 0.05
+CARNIVAL_options$threads <- 2
+```
+
+This is where cosmosR run.
+
+```{r, warning=FALSE, message=FALSE}
+test_result_for <- run_COSMOS_signaling_to_metabolism(data = test_for,
+                                                      CARNIVAL_options = CARNIVAL_options)
+```
+
+Finally, we process the results of the first cosmosR run, to translate gene names and metabolites name.
+
+```{r, warning=FALSE, message=FALSE}
+formated_result_for <- format_COSMOS_res(test_result_for)
+```
+
+## Tutorial section: metabolism to signaling 
+
+Before we run the metabolism to signaling part, we need to prepare again the inputs. 
+```{r, warning=FALSE, message=FALSE}
+CARNIVAL_options$timelimit <- 3600
+CARNIVAL_options$mipGAP <- 0.05
+CARNIVAL_options$threads <- 2
+```
+
+Now that the correct time is set up for the pre-optimisation run, we can prepare the inputs.
+
+```{r, warning=FALSE, message=FALSE}
+test_back <- preprocess_COSMOS_metabolism_to_signaling(meta_network = toy_network,
+                                        signaling_data = toy_signaling_input,
+                                        metabolic_data = toy_metabolic_input,
+                                                       diff_expression_data = toy_RNA,
+                                                       maximum_network_depth = 15,
+                                                       remove_unexpressed_nodes = FALSE,
+                                                       CARNIVAL_options = CARNIVAL_options)
+
+```
+
+Then we can run cosmosR to connect metabolism to signaling. The running time here usually needs to be longer, as this problem seems to be harder to solve for CPLEX.
+
+```{r, warning=FALSE, message=FALSE}
+CARNIVAL_options$timelimit <- 28800
+
+test_result_back <- run_COSMOS_metabolism_to_signaling(data = test_back,
+                                                       CARNIVAL_options = CARNIVAL_options)
+```
+
+Finally we can format the result of the backward run as well (same as for forward run)
+
+```{r, warning=FALSE, message=FALSE}
+formated_result_back <- format_COSMOS_res(test_result_back)
+```
+
+## Tutorial section: Merge forward and backward networks and visualise network
+
+Here we simply take the union of forward and backward runs to create a full network solution lopping between signaling, gene-regulation and metabolism. Since there is an overlap between the result network of forward and backward run, you may optionally want  to check if there are any node sign that are incoherent in the overlap between the two solutions.
+
+```{r, warning=FALSE, message=FALSE}
+full_sif <- as.data.frame(rbind(formated_result_for[[1]], formated_result_back[[1]]))
+full_sif <- full_sif[full_sif$Weight>0,]
+full_attributes <- as.data.frame(rbind(formated_result_for[[2]], formated_result_back[[2]]))
+
+full_sif <- unique(full_sif)
+full_attributes <- unique(full_attributes)
+```
+
+This function will generate a dynamic network plot centered on a given node of the network solution, and connecting it to measured nodes in the given range (here 7 steps).
+
+```{r, warning=FALSE, message=FALSE}
+network_plot <- display_node_neighboorhood(central_node = 'Metab__D-Glucitol_c', 
+                                           sif = full_sif, 
+                                           att = full_attributes, 
+                                           n = 7)
+
+network_plot
+```
+Here is how this network can be intepreted (this is purely illustrative, as some of those interaction may be incorectly signed because lpsolve can only use positive interactions): 
+
+This network represents the flow of activities that can connect MYC up-regulation with Glucitol (Sorbitol) accumulation. Here, NFKB1 can upregulate the expression of SLC2A1, which in turn transport more glucose in the cytoplasm. The increase transport of glucose can lead to more glucose being avlaible for conversion into glucitol by the AKR1A enzyme. Interestingly, glucitol is a now activator of MAPK14, thus leading to the appearance of a positive feedback loop connecting MYC, glucitol and MAPK14.
+
+It is important to understand that each of this links is hypothetical. The come from a larger pool of 
+potential molecular interactions present in multiple online databases and compiled in omnipath, STITCH 
+and recon metabolic network. They exist in the literature and are interactions that are known to
+potentially exists in other experimental contexts. Thus, COSMOS compile all those potential interactions 
+together and proposes a coherent set that can explain the data at hand.
+
+Those links should however be considered only as potential mechanistic connections, and will need to be further 
+confirmed experimentally. Those interactions can be searched in the literature to see in which other disease or experimental context they have been shown to be relevant. Taken together, multiple interactions can help to build a biological story that can guide further underatanding of the underlying biology and decide on future experiments.
+
+## Tutorial section: Over Representation Analysis
+
+Often it is useful to perform an Over Representation Analysis (ORA) on the
+resulting nodes of a COSMOS network as a first analysis step to get a more 
+functional interpretation on the modeled signaling cascade. A common way to this
+is to test whether the selected genes (nodes) in the COSMOS solution network
+show statistically significant differences in comparison to the prior-knowledge
+network (PKN). 
+
+The differentially expressed genes give information about the cellular
+processes that are deregulated and if the proportions in various pathways are
+SIGNIFICANTLY different from what is expected.In this way the significant 
+differences between two biological conditions (e.g. cancer vs. normal tissue, or
+treatment vs. untreated cells) can be shown.
+
+Algorithms that perform an ORA are implemented in other R packages like piano or
+decoupleR. In addition to a gene set collection these algorithms require two 
+different lists as inputs:
+- nodes in the COSMOS solution network which relate back to the input data
+  (e.g. transcriptomics, proteomics, metabolomics, fluxomics, or perturbations) 
+- all nodes (kinases, transcription factors, metabolites) in the prior-knowledge
+  network (which are used as the background in our analysis)
+  
+In this section we will show how to obtain these two lists from a formated 
+COSMOS result object.
+
+```{r, warning=FALSE, message=FALSE}
+sif_forward = formated_result_for[[1]]
+att_forward = formated_result_for[[2]]
+nodes_ORA = extract_nodes_for_ORA(
+    sif = sif_forward, 
+    att = att_forward)
+```
+
+Now this forward and backward sets can be used with any ORA analysis. 
+
+```{r, warning=FALSE, message=FALSE}
+sessionInfo()
+```
+
+```{r}
+# Standalone function to filter TF → gene interactions
+filter_TF_gene_edges <- function(network, tf_activity, gene_expression, tf_regulon) {
+  # network: data.frame with columns source, interaction (+1/-1), target
+  # tf_activity: named vector, TF names as names, activity as values
+  # gene_expression: named vector, gene names as names, binarized expression (-1,0,1)
+  # tf_regulon: data.frame with columns tf, target, sign (+1/-1)
+  
+  # Keep only TFs in the regulon
+  tf_activity <- tf_activity[names(tf_activity) %in% tf_regulon$tf]
+  
+  # Build a data frame for genes
+  gene_exp_df <- data.frame(
+    target = names(gene_expression),
+    target_sign = gene_expression,
+    stringsAsFactors = FALSE
+  )
+  
+  # Build a data frame for TFs
+  tf_df <- data.frame(
+    source = names(tf_activity),
+    TF_sign = tf_activity,
+    stringsAsFactors = FALSE
+  )
+  
+  # Annotate network with gene expression and TF activity
+  annotated_network <- merge(network, gene_exp_df, by = "target", all.x = TRUE)
+  annotated_network <- merge(annotated_network, tf_df, by = "source", all.x = TRUE)
+  
+  # Flag edges
+  annotated_network$source_is_TF <- annotated_network$source %in% tf_regulon$tf
+  annotated_network$target_gene_unchanged <- annotated_network$target_sign == 0
+  annotated_network$TF_target_unchanged <- annotated_network$source_is_TF & 
+    (annotated_network$target_gene_unchanged | is.na(annotated_network$target_gene_unchanged))
+  annotated_network$inconsistent_TF_gene_sign <- annotated_network$source_is_TF & 
+    !is.na(annotated_network$TF_sign) & !is.na(annotated_network$target_sign) &
+    (sign(annotated_network$TF_sign) != annotated_network$interaction * sign(annotated_network$target_sign))
+  
+  # Remove inconsistent or unchanged edges
+  removed_edges <- annotated_network[annotated_network$TF_target_unchanged | annotated_network$inconsistent_TF_gene_sign, ]
+  message("Removed ", nrow(removed_edges), " inconsistent TF → gene edges.")
+  
+  # Keep consistent edges
+  kept_edges <- annotated_network[!(annotated_network$TF_target_unchanged | annotated_network$inconsistent_TF_gene_sign), ]
+  return(kept_edges[, c("source", "interaction", "target")])
+}
+```
+
+```{r}
+# Example PKN
+network <- data.frame(
+  source = c("TF1","TF2","TF3"),
+  interaction = c(1,-1,1),
+  target = c("GeneA","GeneB","GeneC")
+)
+
+# TF activities
+tf_activity <- c(TF1 = 1, TF2 = 1, TF3 = 0)
+
+# Gene expression (binarized)
+gene_expression <- c(GeneA = 1, GeneB = 1, GeneC = 0)
+
+# TF regulon
+tf_regulon <- data.frame(
+  tf = c("TF1","TF2","TF3"),
+  target = c("GeneA","GeneB","GeneC"),
+  sign = c(1,-1,1)
+)
+
+# Run filter
+filtered_network <- filter_TF_gene_edges(network, tf_activity, gene_expression, tf_regulon)
+print(filtered_network)
+```
+

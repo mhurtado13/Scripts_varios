@@ -1,0 +1,220 @@
+
+Load libraries
+```{r}
+#imports
+library(readr)
+
+#core methods
+library(cosmosR)
+library(MOFA2)
+library(liana)
+library(decoupleR)
+
+#data manipulations
+library(dplyr)
+library(reshape2)
+library(GSEABase)
+library(tidyr)
+
+#plotting
+library(ggplot2)
+library(ggfortify)
+library(pheatmap)
+library(gridExtra)
+library(RColorBrewer)
+# library(RCy3)
+```
+
+From omics data to MOFA input 
+```{r}
+mofa_input = read.csv("~/Documents/Factor_COSMOS/data/mofa/mofa_data.csv")
+```
+
+Run MOFA (don't run, results are already in the repository)
+```{r}
+for(i in c(5:15,20,length(unique(mofa_input$sample)))){
+    wd <- getwd()
+    write_MOFA_options_file(input_file = '/data/mofa/mofa_data.csv', output_file = paste0('/results/mofa/mofa_res_',i,'factor.hdf5'), factors = i, convergence_mode = "slow", likelihoods = c('gaussian','gaussian','gaussian'))
+    system(paste0(paste('python3', wd, sep = " "), paste('/scripts/mofa/mofa2.py', "options_MOFA.csv")))
+}
+```
+
+Inspect MOFA results
+```{r}
+# Load MOFA output
+for(i in c(5:15,20,length(unique(mofa_input$sample)))){
+  filepath <- paste0('~/Documents/Factor_COSMOS/results/mofa/mofa_res_',i,'factor.hdf5')
+  model <- load_model(filepath)
+  meta_data <- read_csv("~/Documents/Factor_COSMOS/data/metadata/RNA_metadata_cluster.csv")[,c(1,2)]
+  colnames(meta_data) <- c("sample","cluster")
+  mofa_metadata <- merge(samples_metadata(model), meta_data, by = "sample")
+  names(mofa_metadata) <- c("sample","group","cluster")
+  samples_metadata(model) <- mofa_metadata
+  assign(paste0("model",i),model)
+}
+```
+
+Plot factor values
+```{r}
+## Top 20 factor weights per view
+grid.arrange(
+  ### RNA
+  plot_top_weights(model, 
+                   view = "RNA",
+                   factor = 4,
+                   nfeatures = 10) +
+    ggtitle("RNA"),
+  ### Proteomics
+  plot_top_weights(model, 
+                   view = "proteo",
+                   factor = 4,
+                   nfeatures = 10) + 
+    ggtitle("Proteomics"),
+  ### Metabolomics
+  plot_top_weights(model, 
+                   view = "metab",
+                   factor = 4,
+                   nfeatures = 10) + 
+    ggtitle("Metabolomics"), ncol =3
+)
+```
+
+From MOFA output to TF activity, ligand-receptor activity
+
+Extract the weights from our MOFA model and keep the weights from Factor 4 in the RNA view.
+```{r}
+weights <- get_weights(model, views = "all", factors = "all")
+```
+
+RNA weights 
+```{r}
+RNA <- data.frame(weights$RNA[,4]) 
+row.names(RNA) <- gsub("_RNA","",row.names(RNA))
+```
+
+Metabolite weights
+```{r}
+metabs_all <- as.data.frame(weights$metab) 
+row.names(metabs_all) <- gsub("_metab","",row.names(metabs_all))
+
+#extract top metab weights
+metabs_top <- metabs_all[order(apply(metabs_all,1,function(x){max(abs(x))}), decreasing = T)[1:10],]
+```
+
+Then we load the consensus networks from our databases, as well as the TF-targets regulons from collectri.
+```{r}
+# Load LIANA (receptor and ligand) consensus network
+# ligrec_ressource <- distinct(liana::decomplexify(liana::select_resource("Consensus")[[1]]))
+# save(ligrec_ressource, file = "support/ligrec_ressource.RData")
+
+#process the LR interaction prior knowledge to make suitable input for decoupleR
+load(file = "~/Documents/Factor_COSMOS/support/ligrec_ressource.RData")
+ligrec_geneset <- format_LR_ressource(ligrec_ressource)
+
+# Load Dorothea (TF) network
+# dorothea_df <- decoupleR::get_collectri()
+# save(dorothea_df, file = "support/dorothea_df.RData")
+load(file = "~/Documents/Factor_COSMOS/support/dorothea_df.RData")
+```
+
+Calculate regulatory activities with decoupleR
+```{r}
+# Calculate regulatory activities from Receptor and Ligand network
+ligrec_high_vs_low <- run_ulm(mat = as.matrix(RNA), network = ligrec_geneset, .source = set, .target = gene, minsize = 2) 
+ligrec_high_vs_low <- ligrec_high_vs_low[ligrec_high_vs_low$statistic == "ulm",]
+ligrec_high_vs_low_vector <- ligrec_high_vs_low$score
+names(ligrec_high_vs_low_vector) <- ligrec_high_vs_low$source
+
+# Calculate regulatory activities from TF network
+TF_high_vs_low <- run_ulm(mat = as.matrix(RNA), network = dorothea_df, minsize = 10)
+TF_high_vs_low <- TF_high_vs_low[TF_high_vs_low$statistic == "ulm",]
+TF_high_vs_low_vector <- TF_high_vs_low$score
+names(TF_high_vs_low_vector) <- TF_high_vs_low$source
+
+## Save results
+ligrec_TF_moon_inputs <- list("ligrec" = ligrec_high_vs_low_vector,
+                              "TF" = TF_high_vs_low_vector)
+
+```
+
+Extracting network with COSMOS to formulate mechanistic hypotheses
+```{r}
+signaling_input <- ligrec_TF_moon_inputs$TF
+ligrec_input <- ligrec_TF_moon_inputs$ligrec
+
+RNA_input <- weights$RNA[,4] 
+prot_input <- weights$proteo[,4]
+metab_inputs <- weights$metab[,4]
+
+#remove MOFA tags from feature names
+names(RNA_input) <- gsub("_RNA","",names(RNA_input))
+names(prot_input) <- gsub("_proteo","",names(prot_input))
+```
+
+MOON (meta footprint analysis)
+
+In this part, we will run the network scoring to generate mechanistic hypotheses connecting ligands, receptors, TFs and metabolites, while pruning the network with information from both RNA and protein abundance to constrain the flux of signal consistent with the molecular data available.
+
+In this approach, the network is compressed to avoid having redundant paths in the network leading to inflating the importance of some input measurements.
+
+Processing of the PKN
+```{r}
+load("~/Documents/Factor_COSMOS/support/meta_network.RData")
+
+### Remove unexpressed genes from the PKN
+expressed_genes <- as.data.frame(read_csv("~/Documents/Factor_COSMOS/data/RNA/RNA_log2_FPKM_clean.csv"))
+expressed_genes <- setNames(rep(1,length(expressed_genes[,1])), expressed_genes$Genes)
+meta_network_filtered <- cosmosR:::filter_pkn_expressed_genes(names(expressed_genes), meta_pkn = meta_network)
+
+##format metab inputs
+metab_inputs <- as.numeric(scale(weights$metab[,4], center = F))
+names(metab_inputs) <- row.names(weights$metab)
+
+metab_to_HMDB <- as.data.frame(
+  read_csv("~/Documents/Factor_COSMOS/data/metabolomic/MetaboliteToHMDB.csv"))
+
+metab_to_HMDB <- metab_to_HMDB[metab_to_HMDB$common %in% names(metab_inputs),]
+metab_inputs <- metab_inputs[metab_to_HMDB$common]
+names(metab_inputs) <- metab_to_HMDB$HMDB
+
+metab_inputs <- cosmosR::prepare_metab_inputs(metab_inputs, compartment_codes = c("m","c"))
+
+#prepare upstream inputs
+upstream_inputs <- c(rec_inputs) #the upstream input should be filtered for most significant
+TF_inputs <- scale(ligrec_TF_moon_inputs$TF, center = F)
+TF_inputs <- setNames(TF_inputs[,1], row.names(TF_inputs))
+downstream_inputs <- c(metab_inputs, TF_inputs) #the downstream input should be complete
+
+upstream_inputs_filtered <- cosmosR:::filter_input_nodes_not_in_pkn(upstream_inputs, meta_network_filtered)
+downstream_inputs_filtered <- cosmosR:::filter_input_nodes_not_in_pkn(downstream_inputs, meta_network_filtered)
+
+n_steps <- 6
+
+# in this step we prune the network to keep only the relevant part between upstream and downstream nodes
+meta_network_filtered <- cosmosR:::keep_controllable_neighbours(meta_network_filtered
+                                                       , n_steps, 
+                                                       names(upstream_inputs_filtered))
+
+
+downstream_inputs_filtered <- cosmosR:::filter_input_nodes_not_in_pkn(downstream_inputs_filtered, meta_network_filtered)
+
+
+meta_network_filtered <- cosmosR:::keep_observable_neighbours(meta_network_filtered, n_steps, names(downstream_inputs_filtered))
+
+
+upstream_inputs_filtered <- cosmosR:::filter_input_nodes_not_in_pkn(upstream_inputs_filtered, meta_network_filtered)
+
+
+#write_csv(meta_network_filtered, file = "results/cosmos/moon/meta_network_filtered.csv")
+
+#compress the network to avoid redundant master controllers
+meta_network_compressed_list <- compress_same_children(meta_network_filtered, sig_input = upstream_inputs_filtered, metab_input = downstream_inputs_filtered)
+
+meta_network_compressed <- meta_network_compressed_list$compressed_network
+
+meta_network_compressed <- meta_network_cleanup(meta_network_compressed)
+
+load(file = "support/dorothea_df.RData")
+
+cosmosR::moon()
+```

@@ -1,0 +1,107 @@
+---
+title: "Methylation deconvolution methods"
+author: "Marcelo Hurtado"
+date: "2026-02-21"
+output: html_document
+---
+
+Load libraries
+```{r}
+source("~/Documents/multimethconv/R/methyl_deconvolution.R")
+library(deconvMe)
+```
+
+Load example datasets
+```{r}
+methyl_set <- minfiData::MsetEx
+ratio_set <- minfi::ratioConvert(methyl_set)
+beta_matrix <- minfi::getBeta(ratio_set)
+```
+
+Compute deconvolution
+```{r}
+deconv = compute.deconvolution(methyl_set, doParallel = T, workers = 3, file_name = "Test")
+```
+
+Deconvolution methods
+
+- EpiDISH (RPC, CP, SVR)
+- Houseman
+- MethylCC
+- MethylResolver
+- MethAtlas
+
+EpiDISH
+```{r}
+result <- deconvMe::deconvolute(methyl_set = methyl_set, method = 'epidish', mode = "CBS")
+result <- deconvMe::deconvolute(methyl_set = methyl_set, method = 'epidish', mode = "RPC")
+result <- deconvMe::deconvolute(methyl_set = methyl_set, method = 'epidish', mode = "CP")
+```
+
+Houseman
+```{r}
+result <- deconvMe::deconvolute(methyl_set = methyl_set, method = 'houseman')
+```
+
+MethylCC
+```{r}
+result <- deconvMe::deconvolute(methyl_set = methyl_set, method = 'methylcc')
+```
+
+MethylResolver
+```{r}
+result <- deconvMe::deconvolute(methyl_set = methyl_set, method = 'methylresolver')
+```
+
+MethAtlas
+```{r}
+result <- deconvMe::deconvolute(methyl_set = methyl_set, method = 'methatlas')
+```
+
+Accessing signatures matrices in deconvME
+```{r}
+library(deconvMe)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+options(matrixStats.useNames.NA = "deprecated")
+
+epidish_sig <- get_epidish_signature_matrix("blood")
+houseman_sig <- get_houseman_signature_matrix()
+methatlas_sig <- get_methatlas_signature_matrix()
+methylresolver_sig <- get_methylresolver_signature_matrix()
+
+write.table(epidish_sig, "signatures/epi-sig.txt", row.names = F)
+write.table(houseman_sig, "signatures/houseman-sig.txt", row.names = F)
+write.table(methatlas_sig, "signatures/methatlas-sig.txt", row.names = F)
+write.table(methylresolver_sig, "signatures/methylresolver-sig.txt", row.names = F)
+```
+
+Cross-Signature Deconvolution
+
+deconvMe supports cross-signature deconvolution, allowing you to use signature matrices from one method with the deconvolution algorithm of another method.
+
+Supported Methods
+
+Method	Cross-Signature Support
+EpiDISH	✅ All methods
+MethAtlas	✅ All methods
+MethylResolver	✅ All methods
+Houseman	❌ Not supported
+MethylCC	❌ Not supported (no classical signature matrix)
+
+```{r}
+# EpiDISH with Houseman signature
+result_epidish_houseman <- run_epidish(beta_matrix, reference = houseman_sig)
+
+# MethAtlas with EpiDISH signature
+result_methatlas_epidish <- run_methatlas(beta_matrix, reference = epidish_sig)
+
+# MethylResolver with MethAtlas signature
+result_mr_methatlas <- run_methylresolver(
+  beta_matrix, 
+  reference = methatlas_sig,
+  alpha = 1
+)
+```
+

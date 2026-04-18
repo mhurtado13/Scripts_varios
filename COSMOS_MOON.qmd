@@ -1,0 +1,102 @@
+---
+title: "Untitled"
+format: html
+---
+
+Load libraries
+```{r}
+library(cosmosR)
+library(reshape2)
+library(readr)
+library(dplyr)
+```
+
+Load data
+```{r}
+load("example_data.RData") ## input data
+load("clean_omnipath_PKN.RData") ## PKN
+```
+
+Extract inputs 
+```{r}
+sig_input <- cosmos_inputs[[1]]$TF_scores
+RNA_input <- cosmos_inputs[[1]]$RNA
+
+sig_input <- sig_input[abs(sig_input) > 2]
+```
+
+Network cleaning and prunning 
+```{r}
+meta_network <- meta_network_cleanup(PKN)
+meta_network <- cosmosR:::filter_pkn_expressed_genes(names(RNA_input), meta_pkn = meta_network)
+n_steps <- 6 #The number of step is quite flexible, 7 steps already covers most of the network
+sig_input <- cosmosR:::filter_input_nodes_not_in_pkn(sig_input, meta_network)
+# meta_network <- cosmosR:::keep_controllable_neighbours(meta_network, n_steps, names(sig_input))
+# metab_input <- cosmosR:::filter_input_nodes_not_in_pkn(metab_input, meta_network)
+meta_network <- cosmosR:::keep_observable_neighbours(meta_network, n_steps, names(sig_input))
+sig_input <- cosmosR:::filter_input_nodes_not_in_pkn(sig_input, meta_network)
+meta_network_compressed_list <- compress_same_children(meta_network, sig_input = sig_input, metab_input = NA)
+
+## Extract compressed network and node signatures and do last cleanup step to remove any self-loops or duplicated edges that may have been created during compression.
+meta_network_compressed <- meta_network_compressed_list$compressed_network
+node_signatures <- meta_network_compressed_list$node_signatures
+duplicated_parents <- meta_network_compressed_list$duplicated_signatures
+meta_network_compressed <- meta_network_cleanup(meta_network_compressed)
+```
+
+Run MOON
+```{r}
+meta_network_TF_to_metab <- meta_network_compressed
+
+load('Collectri_PROGENy_networks.RData')
+net$confidence <- NA
+dorothea_reg <- net[,c('source', 'confidence', 'target', 'mor')]
+
+# PKN = PKN %>%
+#     dplyr::mutate(mor = .data$interaction) %>%
+#     dplyr::select(source, target, mor)
+
+before <- 1
+after <- 0
+i <- 1
+while (before != after & i < 10) {
+  before <- length(meta_network_TF_to_metab[,1])
+  moon_res <- moon(downstream_input = sig_input, 
+                   meta_network = meta_network_TF_to_metab, 
+                   n_layers = n_steps, 
+                   statistic = "ulm") 
+
+  meta_network_TF_to_metab <- filter_incohrent_TF_target(moon_res, dorothea_reg, meta_network_TF_to_metab, RNA_input)
+  after <- length(meta_network_TF_to_metab[,1])
+  i <- i + 1
+}
+```
+
+Extract results and process for saving
+```{r}
+moon_res <- decompress_moon_result(moon_res, meta_network_compressed_list, meta_network_TF_to_metab)
+
+solution_network = cosmosR::reduce_solution_network_double_thresh(decoupleRnival_res = moon_res,
+                                            meta_network = meta_network_TF_to_metab,
+                                            primary_thresh = 0.5,
+                                            secondary_thresh = 0.25,
+                                            upstream_input = sig_input,
+                                            RNA_input = RNA_input)
+
+# solution_network <- reduce_solution_network(decoupleRnival_res = moon_res,
+#                                             meta_network = meta_network,
+#                                             cutoff = 0.5,
+#                                             upstream_input = sig_input,
+#                                             RNA_input = RNA_input,
+#                                             n_steps = n_steps)
+
+SIF <- solution_network$SIF
+names(SIF)[3] <- "sign"
+ATT <- solution_network$ATT
+```
+
+Save results
+```{r}
+write_csv(SIF, file = "SIF.csv", sep = "")
+write_csv(ATT, file = "ATT.csv", sep = "")
+```
