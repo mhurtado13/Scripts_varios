@@ -1,0 +1,50 @@
+---
+title: "Untitled"
+format: html
+---
+
+Load functions
+```{r}
+library(dplyr)
+source("R/functions.R")
+```
+
+```{r}
+counts = read.csv("~/Documents/LungPredict_DC_paper/input/Bulk_counts_raw.csv", row.names = 1)
+coldata = read.csv("~/Documents/LungPredict_DC_paper/input/Bulk_clinical_raw.csv", row.names = 1)
+```
+
+```{r}
+table(coldata$R.NR)
+```
+
+Remove uncomplete cases 
+```{r}
+coldata = coldata %>%
+  dplyr::filter(R.NR %in% c("R", "NR"))
+
+counts = counts[, rownames(coldata)]
+```
+
+DEG analysis
+```{r}
+res_deg = run_deg_analysis(counts, coldata, group_col = "R.NR", ref_level = "NR", pval = 5) 
+res_t = res_deg %>%
+  dplyr::select(t)
+```
+
+TF analysis
+```{r}
+tfs_deg = compute.TFs.activity(res_t,  TF.collection = "CollecTRI", min_targets_size = 5,
+                               return = TRUE, file.name = "Test", universe = NULL) 
+
+head(tfs_deg)
+```
+
+Plot TFs features
+```{r}
+library(ggplot2)
+plot_top_TFs(tfs_deg, n_top = 10) +
+  ggtitle('TF space')
+```
+
