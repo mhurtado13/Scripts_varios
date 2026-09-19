@@ -1,0 +1,71 @@
+---
+title: "Deconvolution analysis"
+format: html
+---
+
+Load library
+```{r}
+library(DeconRNASeq)
+library(multideconv)
+```
+
+Load data
+```{r}
+counts_GSE62564 = read.csv("~/Downloads/raw_counts.csv", row.names = 1)
+counts_target = read.csv("~/Downloads/TARGET.csv", row.names = 1)
+```
+
+Clean target (file has leftover clinical/CIBERSORT annotation rows prefixed with "#", a "reporter" probe-ID column mixed into the actual gene expression rows, and 36 trailing empty sample columns from stray trailing commas in the raw file)
+```{r}
+counts_target = counts_target[!grepl("^#", rownames(counts_target)), ]
+counts_target = counts_target[, colnames(counts_target) != "reporter"]
+counts_target[] = lapply(counts_target, as.numeric)
+counts_target = counts_target[, colSums(!is.na(counts_target)) > 0]
+```
+
+Keep protein-coding genes only (GSE62564 only - too many genes otherwise makes DWLS very slow)
+```{r}
+library(org.Hs.eg.db)
+
+genetypes = AnnotationDbi::select(org.Hs.eg.db, keys = rownames(counts_GSE62564), 
+                                  columns = "GENETYPE", keytype = "SYMBOL")
+coding_symbols = unique(genetypes$SYMBOL[genetypes$GENETYPE == "protein-coding"])
+counts_GSE62564 = counts_GSE62564[rownames(counts_GSE62564) %in% coding_symbols, ]
+```
+
+Cells extra
+```{r}
+cells_extra = c("Bridge", "connecting.Chromaffin.cells", "Neuroblasts", "cycling.Neuroblasts",
+                "SCPs", "cycling.SCPs", "Chromaffin", "Neuroendocrine.cells", "T.cells", "Myeloid.cells",
+                "Stromal.other.cells", "RBCs.cells", "Schwann.cells", "pDC.cells")
+```
+
+Deconvolution
+```{r}
+deconv_GSE62564 = compute.deconvolution(counts_GSE62564, normalized = T, credentials.mail = "marcelo.hurtado@inserm.fr",
+                               doParallel = T, workers = 3, cells_extra = cells_extra, 
+                               credentials.token = "b72981d4d0554bcfffc37472ccd8588d", file_name = "GSE62564")
+
+deconv_target = compute.deconvolution(counts_target, normalized = T, credentials.mail = "marcelo.hurtado@inserm.fr",
+                               doParallel = T, workers = 3, cells_extra = cells_extra,                       credentials.token = "b72981d4d0554bcfffc37472ccd8588d", file_name = "target")
+```
+
+Read deconvolution results
+```{r}
+deconv_GSE62564 = read.csv("Results/Deconvolution_GSE62564.csv", row.names = 1)
+deconv_target = read.csv("Results/Deconvolution_target.csv", row.names = 1)
+```
+
+Deconvolution subgroups
+```{r}
+dt_GSE62564 = compute.deconvolution.analysis(deconv_GSE62564, cells_extra = cells_extra, 
+                                             seed = 123, file_name = "GSE62564")
+
+dt_target = compute.deconvolution.analysis(deconv_target, cells_extra = cells_extra, 
+                                           seed = 123, file_name = "target")
+```
+
+Save results
+```{r}
+save(deconv_GSE62564, deconv_target, dt_GSE62564, dt_target, file = "deconvolution_results_Hafida.RData")
+```
